@@ -2,23 +2,55 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}After The Credits{% endblock %}</title>
-    <link rel="stylesheet" href="{% static 'stylesheet.css' %}">
+    <link rel="stylesheet" href="{% static 'css/main.css' %}">
+    {% block extra_css %}{% endblock %}
 </head>
 <body>
-    <header class="site-header">
-        <a class="brand" href="{% url 'core:home' %}">After The Credits</a>
-        <nav class="site-nav">
-            <a href="{% url 'core:home' %}">Home</a>
-            <a href="{% url 'users:login' %}">Login</a>
-            <a href="{% url 'users:signup' %}">Sign Up</a>
-        </nav>
-    </header>
 
-    <main class="page-shell">
-        {% block content %}{% endblock %}
-    </main>
+    <!-- ── Navbar ──────────────────────────────────────────── -->
+    <nav class="navbar">
+        <a href="{% url 'core:home' %}" class="navbar__logo">
+            <img src="{% static 'images/logo.png' %}" alt="After The Credits">
+        </a>
+
+        <ul class="navbar__links">
+            <li><a href="{% url 'core:browse' %}">Browse</a></li>
+            <li><a href="{% url 'core:about' %}">About</a></li>
+            {% if user.is_authenticated %}
+                <li><a href="{% url 'journal:list' %}">Journal</a></li>
+                <li><a href="{% url 'recommendations:list' %}">For You</a></li>
+                <li>
+                    <form method="post" action="{% url 'users:logout' %}" style="display:inline">
+                        {% csrf_token %}
+                        <button type="submit">Logout</button>
+                    </form>
+                </li>
+            {% else %}
+                <li><a href="{% url 'users:login' %}">Login</a></li>
+            {% endif %}
+        </ul>
+    </nav>
+
+    <!-- ── Flash Messages ──────────────────────────────────── -->
+    {% if messages %}
+        <ul class="messages">
+            {% for message in messages %}
+                <li class="{{ message.tags }}">{{ message }}</li>
+            {% endfor %}
+        </ul>
+    {% endif %}
+
+    <!-- ── Page Content ────────────────────────────────────── -->
+    {% block content %}{% endblock %}
+
+    <!-- ── Footer ──────────────────────────────────────────── -->
+    <footer>
+        <p>&copy; {% now "Y" %} After The Credits</p>
+    </footer>
+
+    {% block extra_js %}{% endblock %}
 </body>
 </html>
