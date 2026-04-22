@@ -1,0 +1,538 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>After the Credits</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    @font-face {
+      font-family: "DaysOne Regular";
+      src: url("{% static 'fonts/DaysOne-Regular.ttf' %}") format("truetype");
+    }
+
+        @font-face {
+      font-family: "Courier Prime";
+      src: url("{% static 'fonts/CourierPrime-Bold.ttf' %}") format("truetype");
+    }
+
+    :root {
+      --black:   #000;
+      --near-black: #1f1f1f;
+      --cream:   #EFECE6;
+      --muted:   #888;
+      --radius:  5px;
+    }
+
+    body {
+      background: var(--near-black);
+      color: var(--cream);
+      font-family: "Courier Prime";
+      font-size: 14px;
+      line-height: 1.5;
+      min-height: 100vh;
+    }
+
+    a { text-decoration: none; color: inherit; }
+
+    /* ────────── NAV ────────── */
+    nav {
+      display: flex;
+      align-items: center;
+      gap: 36px;
+      padding: 16px 32px;
+
+    }
+
+    .logo {
+      width: 150px;
+      height: 150px;
+    }
+    img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display: block;
+    }
+  
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 28px;
+      list-style: none;
+    }
+    .nav-links a {
+      font-family: "Courier Prime";
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--cream);
+      letter-spacing: 0.2px;
+      transition: opacity 0.15s;
+    }
+    .nav-links a:hover { opacity: 0.65; }
+
+    /* ────────── HERO BANNER ────────── */
+    .hero {
+      background: var(--cream);
+      border-style: solid;
+      border-width: 10px;
+      border-radius: 25px;
+      border-color: var(--black);
+      padding: 26px 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      margin-left: 50px;
+      margin-right: 50px;
+    }
+
+    .hero-title {
+      font-family: "DaysOne Regular";
+      font-size: clamp(24px, 3.5vw, 38px);
+      font-weight: 400;
+      line-height: 1.18;
+      color: var(--black);
+      max-width: 500px;
+    }
+
+    .btn-register {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      background: var(--near-black);
+      color: var(--cream);
+      font-family: "Courier Prime";
+      font-size: 20px;
+      padding: 14px 32px;
+      border-style: none;
+      border-radius: var(--radius);
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+    .btn-register:hover { opacity: 0.82; }
+
+    /* ────────── FILM STRIP ────────── */
+    .strip-outer {
+      background: var(--near-black);
+      padding: 0;
+    }
+
+    .strip {
+      background: var(--near-black);
+      padding: 10px 0;
+    }
+
+    .sprocket-row {
+      display: flex;
+      padding: 0 10px;
+      gap: 6px;
+    }
+    .sprocket {
+      flex: 1;
+      height: 18px;
+      background: var(--black);
+      border-radius: 3px;
+    }
+
+    .frames-row {
+      display: flex;
+      gap: 8px;
+      padding: 10px 10px;
+    }
+
+    .film-frame {
+      flex: 1;
+      background: var(--cream);
+      color: var(--black);
+      border-radius: 3px;
+      padding: 18px 14px;
+      font-family: "Courier Prime";
+      font-size: 20px;
+      line-height: 1.5;
+      text-align: center;
+      min-height: 110px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* ────────── SEARCH + FILTER ────────── */
+    .search-section {
+      background: var(--near-black);
+      padding: 32px 32px 24px;
+      display: grid;
+      grid-template-columns: 1fr 180px;
+      gap: 24px;
+      align-items: start;
+    }
+
+    .search-left { display: flex; flex-direction: column; gap: 16px; }
+
+    /* Search row */
+    .search-row { display: flex; }
+
+    .search-input {
+      flex: 1;
+      max-width: 280px;
+      height: 38px;
+      background: var(--cream);
+      color: var(--black);
+      border: 2px solid var(--cream3);
+      border-right: none;
+      border-radius: var(--radius) 0 0 var(--radius);
+      font-family: var(--mono);
+      font-size: 13px;
+      padding: 0 12px;
+      outline: none;
+    }
+    .search-input:focus { border-color: #888; }
+
+    .btn-search {
+      height: 38px;
+      padding: 0 18px;
+      background: var(--cream);
+      color: var(--black);
+      border: 2px solid var(--cream3);
+      border-radius: 0 var(--radius) var(--radius) 0;
+      font-family: var(--serif);
+      font-size: 15px;
+      cursor: pointer;
+    }
+    .btn-search:hover { background: var(--cream3); }
+
+    /* Tags */
+    .tags-label {
+      font-family: var(--mono);
+      font-size: 13px;
+      color: var(--cream);
+      margin-bottom: 6px;
+    }
+
+    .tag-input-row { display: flex; }
+
+    .tag-input {
+      width: 180px;
+      height: 34px;
+      background: var(--cream);
+      color: var(--black);
+      border: 2px solid var(--cream3);
+      border-right: none;
+      border-radius: var(--radius) 0 0 var(--radius);
+      font-family: var(--mono);
+      font-size: 13px;
+      padding: 0 10px;
+      outline: none;
+    }
+    .tag-input:focus { border-color: #888; }
+
+    .btn-add {
+      height: 34px;
+      padding: 0 14px;
+      background: var(--cream);
+      color: var(--black);
+      border: 2px solid var(--cream3);
+      border-radius: 0 var(--radius) var(--radius) 0;
+      font-family: var(--serif);
+      font-size: 14px;
+      cursor: pointer;
+    }
+    .btn-add:hover { background: var(--cream3); }
+
+    .chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 6px;
+    }
+
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--cream);
+      color: var(--black);
+      font-family: var(--mono);
+      font-size: 12px;
+      padding: 4px 10px;
+      border-radius: var(--radius);
+      border: 1.5px solid var(--cream3);
+    }
+    .chip-remove {
+      cursor: pointer;
+      font-weight: 700;
+      font-size: 14px;
+      line-height: 1;
+      opacity: 0.55;
+    }
+    .chip-remove:hover { opacity: 1; }
+
+    /* Filter column */
+    .filter-col {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .filter-btn {
+      width: 100%;
+      height: 38px;
+      background: var(--cream);
+      color: var(--black);
+      border: 2px solid var(--cream3);
+      border-radius: var(--radius);
+      font-family: var(--mono);
+      font-size: 13px;
+      font-weight: 700;
+      padding: 0 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+    }
+    .filter-btn:hover { background: var(--cream3); }
+
+    /* ────────── MOVIE GRID ────────── */
+    .grid-section {
+      background: var(--near-black);
+      padding: 8px 32px 24px;
+    }
+
+    .movie-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px;
+    }
+
+    .movie-card {
+      display: flex;
+      flex-direction: column;
+      cursor: pointer;
+      transition: transform 0.15s;
+    }
+    .movie-card:hover { transform: translateY(-3px); }
+
+    .movie-poster {
+      aspect-ratio: 2/3;
+      background: var(--cream);
+      border-radius: 3px 3px 0 0;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .movie-poster img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .movie-name {
+      margin-top: 5px;
+      background: var(--cream);
+      border-top: 1px solid #2a2a2a;
+      padding: 5px 4px 2px;
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--near-black);
+      text-align: center;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* ────────── PAGINATION ────────── */
+    .pagination {
+      background: var(--black);
+      padding: 20px 32px 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+    }
+
+    .page-label {
+      font-family: var(--mono);
+      font-size: 14px;
+      color: var(--cream);
+    }
+
+    .btn-page {
+      height: 36px;
+      padding: 0 20px;
+      background: var(--cream);
+      color: var(--black);
+      border: 2px solid var(--cream3);
+      border-radius: var(--radius);
+      font-family: var(--serif);
+      font-size: 14px;
+      cursor: pointer;
+    }
+    .btn-page:hover:not(:disabled) { background: var(--cream3); }
+    .btn-page:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* ────────── RESPONSIVE ────────── */
+    @media (max-width: 900px) {
+      .movie-grid { grid-template-columns: repeat(3, 1fr); }
+    }
+    @media (max-width: 650px) {
+      .movie-grid { grid-template-columns: repeat(2, 1fr); }
+      .search-section { grid-template-columns: 1fr; }
+      .hero { flex-direction: column; align-items: flex-start; }
+    }
+  </style>
+</head>
+<body>
+
+
+<!-- ═══ NAV ═══ -->
+<nav>
+  <div class="logo" title="After the Credits">
+    <img src="{% static 'media/Logo.png' %}" alt="Logo">
+  </div>
+
+  <ul class="nav-links">
+    <li><a href="#">Browse</a></li>
+    <li><a href="#">About</a></li>
+    <li><a href="#">Login</a></li>
+  </ul>
+</nav>
+<!-- ═══ HERO ═══ -->
+<div class="hero">
+  <h1 class="hero-title">Movie recommendations<br>based on journaling</h1>
+  <a class="btn-register" href="{% url 'users:signup' %}">Register</a>
+</div>
+
+<!-- ═══ FILM STRIP ═══ -->
+<div class="strip-outer">
+  <div class="strip">
+    <div class="sprocket-row">
+      {% for i in "123456789012345" %}<div class="sprocket"></div>{% endfor %}
+    </div>
+
+    <div class="frames-row">
+      <div class="film-frame">Review 3 Movies that you have already watched</div>
+      <div class="film-frame">Get a recommendation for a new movie to watch</div>
+      <div class="film-frame">After the credits... Write a journal entry about the watched movie</div>
+      <div class="film-frame">Enjoy a better recommendation next time!</div>
+    </div>
+
+    <div class="sprocket-row">
+      {% for i in "123456789012345" %}<div class="sprocket"></div>{% endfor %}
+    </div>
+  </div>
+</div>
+
+<!-- ═══ SEARCH + FILTER ═══ -->
+<form class="search-section" method="GET" action="{% url 'core:home' %}">
+  <div class="search-left">
+
+    <!-- Main search -->
+    <div class="search-row">
+      <input
+        class="search-input"
+        type="text"
+        name="q"
+        value="{{ request.GET.q }}"
+        autocomplete="off"
+        aria-label="Search movies"
+      />
+      <button class="btn-search" type="submit">Search</button>
+    </div>
+
+    <!-- Tag input -->
+    <div>
+      <div class="tags-label">Tags</div>
+      <div class="tag-input-row">
+        <input class="tag-input" type="text" id="tag-input" autocomplete="off" aria-label="Add tag" />
+        <button class="btn-add" type="button" onclick="addTag()">Add</button>
+      </div>
+      <div class="chips" id="chips-container">
+        {% for tag in active_tags %}
+        <span class="chip">
+          X {{ tag }}
+          <span class="chip-remove" onclick="removeChip(this)">×</span>
+          <input type="hidden" name="tags" value="{{ tag }}" />
+        </span>
+        {% endfor %}
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Filters -->
+  <div class="filter-col">
+    <button class="filter-btn" type="button" id="btn-media"
+            onclick="toggleFilter('media')">
+      Media type <span>▼</span>
+    </button>
+    <button class="filter-btn" type="button" id="btn-genres"
+            onclick="toggleFilter('genres')">
+      Genres <span>▼</span>
+    </button>
+    <button class="filter-btn" type="button" id="btn-runtime"
+            onclick="toggleFilter('runtime')">
+      Runtime <span>▼</span>
+    </button>
+    <!-- Hidden filter values get appended here by JS -->
+    <div id="filter-inputs"></div>
+  </div>
+</form>
+
+<!-- ═══ MOVIE GRID ═══ -->
+<div class="grid-section">
+  <div class="movie-grid">
+    {% for movie in movies %}
+      <a class="movie-card" href="{% url 'movie_detail' movie.id %}">
+        <div class="movie-poster">
+          {% if movie.poster_url %}
+            <img src="{{ movie.poster_url }}" alt="{{ movie.title }}" loading="lazy" />
+          {% else %}
+            Movie poster
+          {% endif %}
+        </div>
+        <div class="movie-name">{{ movie.title }}</div>
+      </a>
+    {% empty %}
+      {# Placeholder cards for development — remove when queryset is wired up #}
+      {% for i in "12345678901234567890" %}
+      <div class="movie-card">
+        <div class="movie-poster">Movie poster</div>
+        <div class="movie-name">Movie name</div>
+      </div>
+      {% endfor %}
+    {% endfor %}
+  </div>
+</div>
+
+<!-- ═══ PAGINATION ═══ -->
+<div class="pagination">
+  {% if movies.has_previous %}
+    <a href="?page={{ movies.previous_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}">
+      <button class="btn-page">Previous</button>
+    </a>
+  {% else %}
+    <button class="btn-page" disabled>Previous</button>
+  {% endif %}
+
+  <span class="page-label">Page: {{ movies.number|default:"1" }}</span>
+
+  {% if movies.has_next %}
+    <a href="?page={{ movies.next_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}">
+      <button class="btn-page">Next</button>
+    </a>
+  {% else %}
+    <button class="btn-page" disabled>Next</button>
+  {% endif %}
+</div>
+
+
+</body>
+</html>

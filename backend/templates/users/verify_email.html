@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+
+{% block title %}Verify Email — After The Credits{% endblock %}
+
+{% block content %}
+<div class="auth-page">
+    <div class="auth-card">
+        <h1 class="auth-card__title">Check your inbox</h1>
+        <p class="auth-card__subtitle">
+            We sent a 6-digit code to <strong>{{ email }}</strong>.<br>
+            It expires in 10 minutes.
+        </p>
+
+        <form method="post" novalidate class="form-light">
+            {% csrf_token %}
+
+            <div class="form-group">
+                <label for="{{ form.code.id_for_label }}">Verification code</label>
+                {{ form.code }}
+                {% if form.code.errors %}
+                    <ul class="form-errors">
+                        {% for e in form.code.errors %}<li>{{ e }}</li>{% endfor %}
+                    </ul>
+                {% endif %}
+            </div>
+
+            <button type="submit" class="btn btn-dark" style="width:100%; margin-top: 8px;">
+                Verify Email
+            </button>
+        </form>
+
+        <p class="auth-card__footer" style="margin-top: 20px;">
+            Didn't receive it?
+        </p>
+        <form method="post" action="{% url 'users:resend_code' %}" style="margin-top: 8px;">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-outline-dark" style="width:100%;">
+                Resend code
+            </button>
+        </form>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,7 @@
+django>=4.2,<5.0
+psycopg2-binary
+pgvector
+python-dotenv
+sentence-transformers
+requests
+Pillow

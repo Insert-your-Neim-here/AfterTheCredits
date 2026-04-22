@@ -1,0 +1,24 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}After The Credits{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'stylesheet.css' %}">
+</head>
+<body>
+    <header class="site-header">
+        <a class="brand" href="{% url 'core:home' %}">After The Credits</a>
+        <nav class="site-nav">
+            <a href="{% url 'core:home' %}">Home</a>
+            <a href="{% url 'users:login' %}">Login</a>
+            <a href="{% url 'users:signup' %}">Sign Up</a>
+        </nav>
+    </header>
+
+    <main class="page-shell">
+        {% block content %}{% endblock %}
+    </main>
+</body>
+</html>
