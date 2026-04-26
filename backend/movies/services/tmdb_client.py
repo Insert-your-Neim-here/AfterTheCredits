@@ -31,6 +31,44 @@ def _tmdb_get(path: str, params: dict = None) -> dict:  # type: ignore
     response.raise_for_status()
     return response.json()
 
+
+def search_movies(query: str, page: int = 1):
+    data = _tmdb_get(
+        "/search/movie",
+        params={
+            "query": query,
+            "include_adult": "false",
+            "language": "en-GB",
+            "page": page,
+        },
+    )
+    return data.get("results", [])
+
+def popular_movies(page: int = 1, uk_only: bool = False):
+    if uk_only:
+        data = _get(
+            "/discover/movie",
+            params={
+                "language": "en-GB",
+                "page": page,
+                "sort_by": "popularity.desc",
+                "watch_region": REGION,
+                "with_watch_monetization_types": "flatrate",
+                "include_adult": "false",
+            },
+        )
+    else:
+        data = _tmdb_get(
+            "/movie/popular",
+            params={
+                "language": "en-GB",
+                "page": page,
+            },
+        )
+    return data.get("results", [])
+
+
+
 def fetch_and_store_genres():
     """Fetch all movie genres from TMDb and store them."""
     data = _tmdb_get("/genre/movie/list")
