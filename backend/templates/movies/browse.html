@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block content %}
+
+<form class="controls" method="get" action="{% url 'movies:browse' %}">
+  <input class="input" name="q" value="{{ q|default:'' }}" placeholder=" " />
+  <button class="btn" type="submit">Search</button>
+</form>
+
+
+<!-- ═══ MOVIE GRID ═══ -->
+  <div class="movie-grid">
+    {% for movie in movies %}
+      <a class="movie-card" href="{% url 'movies:details' movie.id %}">
+        <div class="movie-card__poster">
+          {% if movie.poster_url %}
+             <img src="{{ movie.poster_url }}" alt="{{ movie.title }}" loading="lazy">
+          {% else %}
+            Movie poster
+          {% endif %}
+        </div>
+        <div class="movie-card__title">{{ movie.title }}</div>
+      </a>
+    {% endfor %}
+  </div>
+
+
+{% endblock %}

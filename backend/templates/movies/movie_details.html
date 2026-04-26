@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{{ movie.title }} — After The Credits{% endblock %}
+
+{% block content %}
+
+<!-- Backdrop -->
+{% if movie.backdrop_url %}
+<div class="movie-backdrop" style="background-image: url('{{ movie.backdrop_url }}');"></div>
+{% endif %}
+
+<div class="container movie-detail-container">
+
+  <div class="movie-detail-grid">
+
+    <!-- Poster -->
+    <aside class="movie-poster-col">
+      {% if movie.poster_url %}
+        <img src="{{ movie.poster_url }}" alt="{{ movie.title }} poster" class="movie-detail-poster">
+      {% else %}
+        <div class="movie-poster-placeholder">NO POSTER</div>
+      {% endif %}
+
+      <!-- Wishlist button -->
+      {% if user.is_authenticated %}
+        <form method="post" action="{% url 'movies:toggle_wishlist' movie.tmdb_id %}">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-block {% if in_wishlist %}btn-secondary{% else %}btn-primary{% endif %}">
+            {% if in_wishlist %}✓ In Wishlist{% else %}+ Add to Wishlist{% endif %}
+          </button>
+        </form>
+      {% else %}
+        <a href="{% url 'users:login' %}" class="btn btn-primary btn-block">Log in to Wishlist</a>
+      {% endif %}
+    </aside>
+
+    <!-- Details -->
+    <main class="movie-detail-main">
+      <h1 class="movie-detail-title">{{ movie.title }}</h1>
+
+      <div class="movie-meta-row">
+        {% if movie.release_date %}
+          <span class="tag">{{ movie.release_date|date:"Y" }}</span>
+        {% endif %}
+        {% if movie.runtime %}
+          <span class="tag">{{ movie.runtime }} min</span>
+        {% endif %}
+        {% if movie.vote_average %}
+          <span class="tag tag-rating">★ {{ movie.vote_average|floatformat:1 }}</span>
+        {% endif %}
+      </div>
+
+      {% if movie.genres.all %}
+        <div class="movie-genres-row">
+          {% for genre in movie.genres.all %}
+            <a href="{% url 'core:browse' %}?genre={{ genre.name }}" class="tag tag-genre">{{ genre.name }}</a>
+          {% endfor %}
+        </div>
+      {% endif %}
+
+      {% if movie.overview %}
+        <p class="movie-overview">{{ movie.overview }}</p>
+      {% endif %}
+
+      {% if movie.streaming_platforms.all %}
+        <div class="streaming-section">
+          <h3 class="streaming-heading">STREAM ON</h3>
+          <div class="streaming-logos">
+            {% for platform in movie.streaming_platforms.all %}
+              <div class="streaming-badge" title="{{ platform.name }}">
+                {% if platform.logo_url %}
+                  <img src="{{ platform.logo_url }}" alt="{{ platform.name }}" class="streaming-logo">
+                {% else %}
+                  <span class="streaming-name">{{ platform.name }}</span>
+                {% endif %}
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+      {% endif %}
+
+      <!-- Journal CTA -->
+      {% if user.is_authenticated %}
+        <div class="journal-cta">
+          <h3>SEEN IT?</h3>
+          <p>Add this to your journal and get smarter recommendations.</p>
+          <a href="{% url 'journal:create' %}?movie={{ movie.tmdb_id }}" class="btn btn-primary">
+            Write a Journal Entry
+          </a>
+        </div>
+      {% endif %}
+
+    </main>
+  </div>
+
+</div>
+{% endblock %}

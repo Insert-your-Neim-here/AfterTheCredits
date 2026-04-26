@@ -1,13 +1,28 @@
-{% extends "base.html" %}
-{% load static %}
+{%load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign Up — After The Credits</title>
+    <link rel="stylesheet" href="{% static 'stylesheet.css' %}">
+</head>
+<body>
 
 
 
-{% block title %}Sign Up — After The Credits{% endblock %}
 
-{% block content %}
+
+<body>
 <div class="auth-page">
     <div class="auth-card">
+        <div class="auth-card_logo_container">
+        <div class="auth-card__logo">
+        <a href="{% url 'core:home' %}" class="navbar__logo">
+            <img src="{% static 'media/Logo.png' %}" alt="After The Credits">
+        </a>
+        </div>
+        </div>
         <h1 class="auth-card__title">Create account</h1>
         <p class="auth-card__subtitle">Join to get personalised movie recommendations.</p>
 
@@ -60,4 +75,5 @@
         </p>
     </div>
 </div>
-{% endblock %}
+
+</body>

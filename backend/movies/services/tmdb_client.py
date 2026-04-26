@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 TMDB_BASE = "https://api.themoviedb.org/3"
 TMDB_TOKEN = os.environ.get("TMDB_TOKEN")
 REGION = "GB"
-
+TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p/w500"
 
 if not TMDB_TOKEN:
     raise RuntimeError("TMDB_TOKEN is not set. Check your .env file.")
@@ -26,8 +26,12 @@ def _headers():
 
 def _tmdb_get(path: str, params: dict = None) -> dict:  # type: ignore
     params = params or {}
-    params["api_key"] = settings.TMDB_API_KEY
-    response = requests.get(f"{TMDB_BASE}{path}", params=params, timeout=10)
+    response = requests.get(
+        f"{TMDB_BASE}{path}",
+        headers=_headers(),
+        params=params,
+        timeout=10,
+    )
     response.raise_for_status()
     return response.json()
 
@@ -46,7 +50,7 @@ def search_movies(query: str, page: int = 1):
 
 def popular_movies(page: int = 1, uk_only: bool = False):
     if uk_only:
-        data = _get(
+        data = _tmdb_get(
             "/discover/movie",
             params={
                 "language": "en-GB",
@@ -68,6 +72,48 @@ def popular_movies(page: int = 1, uk_only: bool = False):
     return data.get("results", [])
 
 
+def get_genres():
+    data = _tmdb_get(
+        "/genre/movie/list",
+        params={"language": "en-GB"},
+    )
+    return data.get("genres", [])
+
+def discover_movies(
+    page: int = 1,
+    genre: str = "",
+    runtime: str = "",
+    year: str = "",
+    sort_by: str = "popularity.desc",
+    uk_only: bool = True,
+):
+    params = {
+        "language": "en-GB",
+        "page": page,
+        "sort_by": sort_by,
+        "include_adult": "false",
+    }
+
+    if genre:
+        params["with_genres"] = genre
+
+    if runtime == "short":
+        params["with_runtime.lte"] = 89
+    elif runtime == "medium":
+        params["with_runtime.gte"] = 90
+        params["with_runtime.lte"] = 120
+    elif runtime == "long":
+        params["with_runtime.gte"] = 121
+
+    if year:
+        params["primary_release_year"] = year
+
+    if uk_only:
+        params["watch_region"] = REGION
+        params["with_watch_monetization_types"] = "flatrate"
+
+    data = _tmdb_get("/discover/movie", params=params)
+    return data.get("results", [])
 
 def fetch_and_store_genres():
     """Fetch all movie genres from TMDb and store them."""
@@ -176,3 +222,9 @@ def _process_movie(item: dict, genre_map: dict):
     movie.streaming_platforms.set(platforms)
 
     movie.save()
+
+
+def poster_url(poster_path: str | None):
+    if not poster_path:
+        return None
+    return f"{TMDB_IMAGE_BASE}{poster_path}"

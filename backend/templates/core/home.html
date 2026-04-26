@@ -399,7 +399,7 @@
   </div>
 
   <ul class="nav-links">
-    <li><a href="#">Browse</a></li>
+    <li><a href="{% url 'movies:browse' %}">Browse</a></li>
     <li><a href="#">About</a></li>
     <li><a href="{% url 'users:login' %}">Login</a></li>
   </ul>
@@ -490,7 +490,7 @@
 <div class="grid-section">
   <div class="movie-grid">
     {% for movie in movies %}
-      <a class="movie-card" href="{% url 'movie_detail' movie.id %}">
+      <a class="movie-card" href="#">
         <div class="movie-poster">
           {% if movie.poster_url %}
             <img src="{{ movie.poster_url }}" alt="{{ movie.title }}" loading="lazy" />

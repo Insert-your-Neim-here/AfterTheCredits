@@ -53,8 +53,8 @@ body {
 }
 
 .navbar__logo img {
-    width: 72px;
-    height: 72px;
+    width: 120px;
+    height: 120px;
     border-radius: 50%;
     object-fit: cover;
     display: block;
@@ -238,6 +238,16 @@ body {
     width: 100%;
     max-width: 460px;
     border: 2px solid var(--cream-border);
+    display: flex;
+    flex-direction: column;
+}
+.auth-card_logo_container {
+    display: flex;
+    justify-content: center;
+    margin-top: -25px;
+}
+.auth-card__logo {
+    margin-bottom: 10px;
 }
 
 .auth-card__title {

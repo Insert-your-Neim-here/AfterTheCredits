@@ -1,8 +1,4 @@
 from django.db import models
-
-# Create your models here.
-
-from django.db import models
 from pgvector.django import VectorField
 from django.conf import settings
 
@@ -28,6 +24,7 @@ class Movie(models.Model):
     release_date = models.DateField(null=True, blank=True)
     runtime = models.IntegerField(null=True, blank=True)  # in minutes
     poster_path = models.CharField(max_length=255, blank=True)
+    backdrop_path = models.CharField(max_length=255, blank=True)
     vote_average = models.FloatField(default=0)
     vote_count = models.IntegerField(default=0)
     popularity = models.FloatField(default=0)
