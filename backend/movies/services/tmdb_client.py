@@ -1,30 +1,30 @@
+import os
+
 import requests
 import logging
 from django.conf import settings
-from sentence_transformers import SentenceTransformer
 from movies.models import Movie, Genre, StreamingPlatform
+from core.services.embedding_service import *
 
 logger = logging.getLogger(__name__)
 
-_model = None
-
-def get_embedding_model():
-    global _model
-    if _model is None:
-        _model = SentenceTransformer('all-MiniLM-L6-v2')
-    return _model
-
-def compute_embedding(text: str) -> list[float]:
-    model = get_embedding_model()
-    return model.encode(text).tolist()
-
-def build_movie_text(title: str, overview: str, genres: list[str]) -> str:
-    genre_str = ", ".join(genres) if genres else "Unknown"
-    return f"{title}. {overview} Genres: {genre_str}."
-
 TMDB_BASE = "https://api.themoviedb.org/3"
+TMDB_TOKEN = os.environ.get("TMDB_TOKEN")
+REGION = "GB"
 
-def _tmdb_get(path: str, params: dict = None) -> dict:
+
+if not TMDB_TOKEN:
+    raise RuntimeError("TMDB_TOKEN is not set. Check your .env file.")
+
+
+def _headers():
+    return {
+        "Authorization": f"Bearer {TMDB_TOKEN}",
+        "Content-Type": "application/json;charset=utf-8",
+    }
+
+
+def _tmdb_get(path: str, params: dict = None) -> dict:  # type: ignore
     params = params or {}
     params["api_key"] = settings.TMDB_API_KEY
     response = requests.get(f"{TMDB_BASE}{path}", params=params, timeout=10)
@@ -43,28 +43,24 @@ def fetch_and_store_genres():
 
 def fetch_streaming_platforms():
     """
-    Fetch watch providers available in the US.
+    Fetch watch providers available in the UK.
     Stores them as StreamingPlatform objects.
     """
-    data = _tmdb_get("/watch/providers/movie", params={"watch_region": "US"})
+    data = _tmdb_get("/watch/providers/movie", params={"watch_region": REGION})
     count = 0
     for provider in data.get("results", []):
         StreamingPlatform.objects.update_or_create(
             name=provider["provider_name"],
-            defaults={
-                "logo_url": f"https://image.tmdb.org/t/p/original{provider['logo_path']}"
-                if provider.get("logo_path") else "",
-            },
         )
         count += 1
     logger.info(f"Synced {count} streaming platforms.")
 
 def fetch_movie_watch_providers(tmdb_id: int) -> list[str]:
-    """Return list of US streaming platform names for a movie."""
+    """Return list of UK streaming platform names for a movie."""
     try:
         data = _tmdb_get(f"/movie/{tmdb_id}/watch/providers")
-        us = data.get("results", {}).get("US", {})
-        flatrate = us.get("flatrate", [])
+        uk = data.get("results", {}).get(REGION, {})
+        flatrate = uk.get("flatrate", [])
         return [p["provider_name"] for p in flatrate]
     except Exception:
         return []

@@ -36,7 +36,7 @@ def home_view(request):
     paginator = Paginator(movies_qs, 20)
     page_obj  = paginator.get_page(request.GET.get('page', 1))
 
-    return render(request, 'backend/templates/core/home.html', {
+    return render(request, 'core/home.html', {
         'movies':           page_obj,
         'page_obj':         page_obj,
         'genres':           genres,

@@ -31,7 +31,6 @@ class Movie(models.Model):
     vote_average = models.FloatField(default=0)
     vote_count = models.IntegerField(default=0)
     popularity = models.FloatField(default=0)
-
     genres = models.ManyToManyField(Genre, blank=True)
     streaming_platforms = models.ManyToManyField(
         StreamingPlatform,

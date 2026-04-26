@@ -205,7 +205,7 @@ body {
 .form-light .form-group input::placeholder { color: #999; }
 .form-light .form-group label { color: var(--black); }
 
-.form-error {
+.form-errors {
     font-size: 0.8rem;
     color: var(--red);
     margin-top: 4px;
