@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Watchlist - After The Credits{% endblock %}
+
+{% block content %}
+<section class="wishlist-page">
+
+  <header class="wishlist-header">
+    <h1 class="wishlist-title">YOUR WATCHLIST</h1>
+    <p class="wishlist-subtitle">{{ entries|length }} film{% if entries|length != 1 %}s{% endif %} saved</p>
+  </header>
+
+  {% if not entries %}
+    <div class="wishlist-empty">
+      <img class="empty-icon-img" src="{% static 'media/wishlist_off.png' %}" alt="">
+      <p class="empty-text">Nothing saved yet.</p>
+      <p class="empty-sub">Find a film you want to watch and hit <strong>Add to Watchlist</strong>.</p>
+      <a href="{% url 'movies:browse' %}" class="btn-cream">BROWSE FILMS</a>
+    </div>
+
+  {% else %}
+    <ul class="wishlist-grid" role="list">
+      {% for entry in entries %}
+      {% with movie=entry.movie %}
+      <li class="wishlist-card">
+
+        <a href="{% url 'movies:details' movie.tmdb_id %}" class="wishlist-poster-wrap">
+          {% if movie.poster_url %}
+            <img
+              src="{{ movie.poster_url }}"
+              alt="{{ movie.title }} poster"
+              class="wishlist-poster"
+              loading="lazy"
+            >
+          {% else %}
+            <div class="wishlist-poster wishlist-poster--placeholder">
+              <span>NO<br>POSTER</span>
+            </div>
+          {% endif %}
+        </a>
+
+        <div class="wishlist-info">
+          <a href="{% url 'movies:details' movie.tmdb_id %}" class="wishlist-movie-title">
+            {{ movie.title }}
+          </a>
+
+          <p class="wishlist-meta">
+            {% if movie.release_date %}{{ movie.release_date|date:"Y" }}{% endif %}
+            {% if movie.runtime %}&middot; {{ movie.runtime }} min{% endif %}
+            {% if movie.vote_average %}&middot; {{ movie.vote_average|floatformat:1 }}/10{% endif %}
+          </p>
+
+          {% if movie.genres.all %}
+          <p class="wishlist-genres">
+            {% for genre in movie.genres.all %}
+              <span class="genre-tag">{{ genre.name }}</span>
+            {% endfor %}
+          </p>
+          {% endif %}
+
+          {% if movie.overview %}
+          <p class="wishlist-overview">{{ movie.overview|truncatechars:140 }}</p>
+          {% endif %}
+
+          <div class="wishlist-actions">
+            <a href="{% url 'journal:create' movie.tmdb_id %}" class="btn-ghost-sm">
+              WRITE ABOUT THIS
+            </a>
+
+            <form
+              method="post"
+              action="{% url 'movies:toggle_wishlist' movie.tmdb_id %}"
+              class="inline-form"
+            >
+              {% csrf_token %}
+              <button type="submit" class="btn-remove">
+                <img class="btn-remove-icon" src="{% static 'media/wishlist_on.png' %}" alt="">
+                REMOVE
+              </button>
+            </form>
+          </div>
+        </div>
+
+        <p class="wishlist-date">
+          Added {{ entry.added_at|date:"d M Y" }}
+        </p>
+
+      </li>
+      {% endwith %}
+      {% endfor %}
+    </ul>
+  {% endif %}
+
+</section>
+{% endblock %}

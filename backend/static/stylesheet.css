@@ -159,6 +159,35 @@ body {
 
 .btn-sm { padding: 6px 16px; font-size: 0.88rem; }
 
+.wishlist-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    border: 1px solid var(--cream);
+    background: transparent;
+    color: var(--cream);
+    cursor: pointer;
+    font-family: var(--font-body);
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    padding: 8px 14px;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.wishlist-btn:hover,
+.wishlist-btn.on-wishlist {
+    background: var(--cream);
+    color: var(--black);
+}
+
+.wishlist-icon {
+    width: 22px;
+    height: 22px;
+    object-fit: contain;
+    flex: 0 0 auto;
+}
+
 /* ── Forms ──────────────────────────────────────────────────── */
 .form-group { margin-bottom: 18px; }
 
@@ -698,6 +727,193 @@ body {
     display: block;
 }
 
+.movie-detail-container {
+    padding-top: 26px;
+    padding-bottom: 72px;
+}
+
+.movie-detail-grid {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(210px, 300px) minmax(0, 1fr);
+    gap: clamp(24px, 5vw, 56px);
+    align-items: start;
+}
+
+.movie-poster-col {
+    width: 100%;
+}
+
+.movie-detail-poster,
+.movie-poster-placeholder {
+    width: 100%;
+    aspect-ratio: 2 / 3;
+    border: 2px solid var(--cream);
+    border-radius: var(--radius);
+    background: #1a1a1a;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
+}
+
+.movie-detail-poster {
+    height: auto;
+    object-fit: cover;
+}
+
+.movie-poster-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--grey);
+    font-family: var(--font-body);
+    font-size: 0.78rem;
+    letter-spacing: 0.08em;
+}
+
+.movie-detail-main {
+    min-width: 0;
+}
+
+.movie-detail-title {
+    max-width: 760px;
+    margin-bottom: 16px;
+    color: var(--cream);
+    font-family: var(--font-display);
+    font-size: clamp(2rem, 5vw, 4.2rem);
+    line-height: 0.98;
+}
+
+.movie-detail-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin: 0 0 18px;
+}
+
+.movie-meta-row,
+.movie-genres-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 14px;
+}
+
+.movie-detail-main .tag {
+    display: inline-flex;
+    align-items: center;
+    min-height: 30px;
+    border: 1px solid #3a3a3a;
+    border-radius: var(--radius);
+    padding: 5px 11px 4px;
+    color: var(--cream);
+    background: rgba(17, 17, 17, 0.72);
+    font-family: var(--font-body);
+    font-size: 0.76rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.movie-detail-main .tag-rating {
+    border-color: var(--cream);
+}
+
+.movie-detail-main .tag-genre:hover {
+    background: var(--cream);
+    color: var(--black);
+    border-color: var(--cream);
+}
+
+.movie-overview {
+    max-width: 720px;
+    margin: 24px 0 0;
+    color: #d7d0c1;
+    font-family: var(--font-body);
+    font-size: 1rem;
+    line-height: 1.75;
+}
+
+.streaming-section {
+    margin-top: 28px;
+}
+
+.streaming-heading,
+.journal-cta h3 {
+    margin: 0 0 10px;
+    color: var(--grey);
+    font-family: var(--font-body);
+    font-size: 0.76rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+}
+
+.streaming-logos {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.streaming-name {
+    display: inline-flex;
+    align-items: center;
+    min-height: 32px;
+    border: 1px solid #333;
+    border-radius: var(--radius);
+    padding: 6px 12px;
+    color: var(--cream);
+    background: rgba(240, 236, 224, 0.06);
+    font-size: 0.82rem;
+}
+
+.journal-cta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    max-width: 760px;
+    margin-top: 34px;
+    padding: 18px;
+    border: 2px solid var(--cream);
+    border-radius: var(--radius);
+    background: rgba(17, 17, 17, 0.86);
+}
+
+.journal-cta__copy {
+    min-width: 0;
+}
+
+.journal-cta p {
+    margin: 0;
+    color: #d7d0c1;
+    font-size: 0.88rem;
+    line-height: 1.45;
+}
+
+.journal-cta__button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    min-height: 44px;
+    padding: 11px 18px 9px;
+    border: 2px solid var(--cream);
+    border-radius: var(--radius);
+    background: var(--cream);
+    color: var(--black);
+    font-family: var(--font-body);
+    font-size: 0.82rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    transition: background 0.15s, border-color 0.15s, transform 0.15s;
+    white-space: nowrap;
+}
+
+.journal-cta__button:hover {
+    background: var(--cream-dark);
+    border-color: var(--cream-dark);
+    transform: translateY(-1px);
+}
+
 .movie-name {
     margin-top: 5px;
     background: var(--cream);
@@ -796,6 +1012,8 @@ footer {
     .filter-col { width: 100%; }
     .filter-select { width: min(100%, 180px); }
     .browse__controls { grid-template-columns: 1fr; }
+    .movie-detail-grid { grid-template-columns: minmax(160px, 240px) minmax(0, 1fr); }
+    .journal-cta { align-items: flex-start; flex-direction: column; }
 }
 
 @media (max-width: 540px) {
@@ -806,6 +1024,13 @@ footer {
     .filmstrip__steps { grid-template-columns: 1fr; }
     .filmstrip__step { border-right: none; border-bottom: 2px solid var(--black); }
     .filmstrip__step:last-child { border-bottom: none; }
+    .movie-detail-container { padding: 18px 18px 52px; }
+    .movie-detail-grid { grid-template-columns: 1fr; gap: 22px; }
+    .movie-poster-col {
+        max-width: 240px;
+    }
+    .movie-detail-title { font-size: clamp(2rem, 12vw, 3.1rem); }
+    .journal-cta__button { width: 100%; }
 }
 
 /* Signup streaming platform picker */
@@ -983,4 +1208,239 @@ footer {
     .signup-page .streaming-card {
         padding: 36px 28px;
     }
+}
+
+/* ── Wishlist page ─────────────────────────────────────────── */
+
+.wishlist-page {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 3rem 1.5rem 5rem;
+}
+
+.wishlist-header {
+  border-bottom: 1px solid #333;
+  padding-bottom: 1.5rem;
+  margin-bottom: 2.5rem;
+}
+
+.wishlist-title {
+  font-family: 'Special Elite', monospace;
+  font-size: clamp(1.8rem, 4vw, 2.8rem);
+  color: #f0ece0;
+  letter-spacing: 0.08em;
+  margin: 0 0 0.25rem;
+}
+
+.wishlist-subtitle {
+  font-family: 'Courier Prime', monospace;
+  font-size: 0.85rem;
+  color: #888;
+  letter-spacing: 0.06em;
+  margin: 0;
+}
+
+/* Empty state */
+.wishlist-empty {
+  text-align: center;
+  padding: 6rem 1rem;
+}
+.empty-icon {
+  font-size: 3.5rem;
+  color: #444;
+  margin: 0 0 1rem;
+}
+.empty-icon-img {
+  width: 52px;
+  height: 52px;
+  object-fit: contain;
+  opacity: 0.55;
+  margin: 0 auto 1rem;
+}
+.empty-text {
+  font-family: 'Special Elite', monospace;
+  font-size: 1.4rem;
+  color: #f0ece0;
+  margin: 0 0 0.5rem;
+}
+.empty-sub {
+  font-family: 'Courier Prime', monospace;
+  font-size: 0.9rem;
+  color: #888;
+  margin: 0 0 2rem;
+}
+.btn-cream {
+  display: inline-block;
+  border: 1px solid #f0ece0;
+  color: #f0ece0;
+  font-family: 'Courier Prime', monospace;
+  font-size: 0.75rem;
+  letter-spacing: 0.1em;
+  padding: 10px 24px;
+  text-decoration: none;
+  transition: background 0.2s, color 0.2s;
+}
+.btn-cream:hover { background: #f0ece0; color: #111; }
+
+/* Grid */
+.wishlist-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.wishlist-card {
+  display: grid;
+  grid-template-columns: 90px 1fr auto;
+  gap: 1.25rem;
+  align-items: start;
+  padding: 1.5rem 0;
+  border-bottom: 1px solid #1e1e1e;
+  position: relative;
+}
+.wishlist-card:first-child { border-top: 1px solid #1e1e1e; }
+
+/* Poster */
+.wishlist-poster-wrap { display: block; flex-shrink: 0; }
+.wishlist-poster {
+  width: 90px;
+  height: 134px;
+  object-fit: cover;
+  display: block;
+  filter: brightness(0.92);
+  transition: filter 0.2s;
+}
+.wishlist-poster-wrap:hover .wishlist-poster { filter: brightness(1); }
+.wishlist-poster--placeholder {
+  background: #1a1a1a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #2a2a2a;
+}
+.wishlist-poster--placeholder span {
+  font-family: 'Courier Prime', monospace;
+  font-size: 0.6rem;
+  color: #444;
+  text-align: center;
+  letter-spacing: 0.1em;
+}
+
+/* Info column */
+.wishlist-info { min-width: 0; }
+
+.wishlist-movie-title {
+  font-family: 'Special Elite', monospace;
+  font-size: 1.1rem;
+  color: #f0ece0;
+  text-decoration: none;
+  display: block;
+  margin-bottom: 0.3rem;
+  transition: color 0.15s;
+}
+.wishlist-movie-title:hover { color: #fff; }
+
+.wishlist-meta {
+  font-family: 'Courier Prime', monospace;
+  font-size: 0.78rem;
+  color: #777;
+  letter-spacing: 0.04em;
+  margin: 0 0 0.5rem;
+}
+
+.wishlist-genres {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 0.6rem;
+}
+.genre-tag {
+  font-family: 'Courier Prime', monospace;
+  font-size: 0.65rem;
+  letter-spacing: 0.08em;
+  border: 1px solid #333;
+  color: #888;
+  padding: 2px 8px;
+  text-transform: uppercase;
+}
+
+.wishlist-overview {
+  font-family: 'Courier Prime', monospace;
+  font-size: 0.82rem;
+  color: #666;
+  line-height: 1.55;
+  margin: 0 0 0.9rem;
+}
+
+/* Actions */
+.wishlist-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.inline-form { margin: 0; }
+
+.btn-ghost-sm {
+  font-family: 'Courier Prime', monospace;
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  color: #888;
+  border: 1px solid #2a2a2a;
+  padding: 5px 12px;
+  text-decoration: none;
+  background: transparent;
+  transition: color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+.btn-ghost-sm:hover { color: #f0ece0; border-color: #555; }
+
+.btn-remove {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: 'Courier Prime', monospace;
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  color: #555;
+  border: 1px solid #222;
+  background: transparent;
+  padding: 5px 12px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+.btn-remove:hover { color: #c0392b; border-color: #c0392b; }
+.btn-remove-icon {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+}
+
+/* Date column */
+.wishlist-date {
+  font-family: 'Courier Prime', monospace;
+  font-size: 0.7rem;
+  color: #444;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  padding-top: 4px;
+  text-align: right;
+}
+
+/* Responsive */
+@media (max-width: 560px) {
+  .wishlist-card {
+    grid-template-columns: 70px 1fr;
+    grid-template-rows: auto auto;
+  }
+  .wishlist-date {
+    grid-column: 2;
+    grid-row: 2;
+    text-align: left;
+    padding-top: 0;
+  }
 }

@@ -116,3 +116,42 @@ def movie_detail_view(request, tmdb_id):
         "active_page": "browse",
     }
     return render(request, "movies/movie_details.html", context)
+from django.contrib.auth.decorators import login_required
+from django.http import JsonResponse
+from django.shortcuts import get_object_or_404, render
+from django.views.decorators.http import require_POST
+
+from .models import Movie, Wishlist
+
+
+
+
+@login_required
+@require_POST
+def toggle_wishlist_view(request, tmdb_id):
+    movie = get_object_or_404(Movie, tmdb_id=tmdb_id)
+    wishlist_item, created = Wishlist.objects.get_or_create(
+        user=request.user, movie=movie
+    )
+    if not created:
+        wishlist_item.delete()
+        on_wishlist = False
+    else:
+        on_wishlist = True
+
+    # Support both AJAX (fetch) and plain form POST
+    if request.headers.get("x-requested-with") == "XMLHttpRequest":
+        return JsonResponse({"on_wishlist": on_wishlist})
+
+    from django.shortcuts import redirect
+    return redirect("movies:detail", tmdb_id=tmdb_id)
+
+
+@login_required
+def wishlist_view(request):
+    entries = (
+        Wishlist.objects.filter(user=request.user)
+        .select_related("movie")
+        .order_by("-added_at")
+    )
+    return render(request, "movies/wishlist.html", {"entries": entries})

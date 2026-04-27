@@ -1,20 +1,12 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% block title %}{{ movie.title }} — After The Credits{% endblock %}
+{% block title %}{{ movie.title }} - After The Credits{% endblock %}
 
 {% block content %}
 
-<!-- Backdrop -->
-{% if movie.backdrop_url %}
-<div class="movie-backdrop" style="background-image: url('{{ movie.backdrop_url }}');"></div>
-{% endif %}
-
 <div class="container movie-detail-container">
-
   <div class="movie-detail-grid">
-
-    <!-- Poster -->
     <aside class="movie-poster-col">
       {% if movie.poster_url %}
         <img src="{{ movie.poster_url }}" alt="{{ movie.title }} poster" class="movie-detail-poster">
@@ -23,19 +15,54 @@
       {% endif %}
     </aside>
 
-    <!-- Details -->
     <main class="movie-detail-main">
       <h1 class="movie-detail-title">{{ movie.title }}</h1>
 
+      {% if user.is_authenticated %}
+        <form
+          id="wishlist-form"
+          method="post"
+          action="{% url 'movies:toggle_wishlist' movie.id %}"
+          class="movie-detail-actions"
+        >
+          {% csrf_token %}
+          <button
+            type="submit"
+            id="wishlist-btn"
+            class="wishlist-btn {% if on_wishlist %}on-wishlist{% endif %}"
+            aria-label="{% if on_wishlist %}Remove from watchlist{% else %}Add to watchlist{% endif %}"
+          >
+            {% if on_wishlist %}
+              <img
+                class="wishlist-icon"
+                src="{% static 'media/wishlist_on.png' %}"
+                data-on-src="{% static 'media/wishlist_on.png' %}"
+                data-off-src="{% static 'media/wishlist_off.png' %}"
+                alt=""
+              >
+            {% else %}
+              <img
+                class="wishlist-icon"
+                src="{% static 'media/wishlist_off.png' %}"
+                data-on-src="{% static 'media/wishlist_on.png' %}"
+                data-off-src="{% static 'media/wishlist_off.png' %}"
+                alt=""
+              >
+            {% endif %}
+            <span class="wishlist-label">{% if on_wishlist %}IN WATCHLIST{% else %}ADD TO WATCHLIST{% endif %}</span>
+          </button>
+        </form>
+      {% endif %}
+
       <div class="movie-meta-row">
         {% if movie.release_date %}
-          <span class="tag">{{ movie.release_date|date:"Y" }}</span>
+          <span class="tag">{{ movie.release_date|slice:":4" }}</span>
         {% endif %}
         {% if movie.runtime %}
           <span class="tag">{{ movie.runtime }} min</span>
         {% endif %}
         {% if movie.vote_average %}
-          <span class="tag tag-rating">★ {{ movie.vote_average|floatformat:1 }}</span>
+          <span class="tag tag-rating">{{ movie.vote_average|floatformat:1 }}/10</span>
         {% endif %}
       </div>
 
@@ -62,19 +89,61 @@
         </div>
       {% endif %}
 
-      <!-- Journal CTA -->
       {% if user.is_authenticated %}
-        <div class="journal-cta">
-          <h3>SEEN IT?</h3>
-          <p>Add this to your journal and get smarter recommendations.</p>
-          <a href="{% url 'journal:create' movie.id %}" class="btn btn-primary">
-            Write a Journal Entry
-          </a>
-        </div>
+        {% if has_journal_entry %}
+          <div class="journal-cta">
+            <div class="journal-cta__copy">
+              <h3>IN YOUR JOURNAL</h3>
+              <p>You already have a journal entry for this movie.</p>
+            </div>
+          </div>
+        {% else %}
+          <div class="journal-cta">
+            <div class="journal-cta__copy">
+              <h3>SEEN IT?</h3>
+              <p>Add this to your journal and get smarter recommendations.</p>
+            </div>
+            <a href="{% url 'journal:create' movie.id %}" class="journal-cta__button">
+              Write Journal Entry
+            </a>
+          </div>
+        {% endif %}
       {% endif %}
-
     </main>
   </div>
-
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+  const form = document.getElementById("wishlist-form");
+  const btn = document.getElementById("wishlist-btn");
+  if (!form || !btn) return;
+
+  form.addEventListener("submit", function (event) {
+    event.preventDefault();
+
+    fetch(form.action, {
+      method: "POST",
+      headers: { "X-Requested-With": "XMLHttpRequest" },
+      body: new FormData(form),
+    })
+      .then((response) => response.json())
+      .then(({ on_wishlist }) => {
+        const icon = btn.querySelector(".wishlist-icon");
+        icon.src = on_wishlist ? icon.dataset.onSrc : icon.dataset.offSrc;
+        btn.querySelector(".wishlist-label").textContent = on_wishlist
+          ? "IN WATCHLIST"
+          : "ADD TO WATCHLIST";
+        btn.setAttribute(
+          "aria-label",
+          on_wishlist ? "Remove from watchlist" : "Add to watchlist"
+        );
+        btn.classList.toggle("on-wishlist", on_wishlist);
+      })
+      .catch(() => form.submit());
+  });
+})();
+</script>
 {% endblock %}
