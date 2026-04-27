@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}What did you think? — After The Credits{% endblock %}
+
+{% block content %}
+<div class="survey-page">
+
+  {# Logo #}
+  <div class="survey-logo">
+    <img src="{% static 'media/logo.png' %}" alt="After The Credits">
+  </div>
+
+   {# Progress bar #}
+  <div class="survey-progress" style="--progress: {{ progress }}%;">
+    <div class="survey-progress__bar"></div>
+  </div>
+
+  {# Question + form #}
+  <div class="survey-text-wrap">
+    <h1 class="survey-question survey-question--left">What do you think about the movie?</h1>
+
+    <form method="post" class="survey-text-form" novalidate>
+      {% csrf_token %}
+      {{ form.raw_text }}
+      {% if form.raw_text.errors %}
+        <p class="survey-error">{{ form.raw_text.errors|join:", " }}</p>
+      {% endif %}
+      <button type="submit" class="survey-save-btn">Save a journal entry</button>
+    </form>
+  </div>
+
+  <p class="survey-counter">{{ step }} / {{ step }}</p>
+
+</div>
+
+<style>
+/* Inherits .survey-page, .survey-logo, .survey-progress from survey_question.html
+   (both extend base.html — styles are page-scoped so redeclare) */
+
+.survey-page {
+  min-height: calc(100vh - 80px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1.5rem 4rem;
+}
+
+.survey-logo { margin-bottom: 2.5rem; }
+.survey-logo img { width: 140px; height: 140px; object-fit: contain; }
+
+.survey-progress {
+  width: min(640px, 90vw);
+  height: 3px;
+  background: #2a2a2a;
+  border-radius: 2px;
+  margin-bottom: 2.5rem;
+  overflow: hidden;
+}
+.survey-progress__bar {
+  height: 100%;
+  background: var(--color-cream, #f0ece0);
+  border-radius: 2px;
+  transition: width 0.4s ease;
+}
+
+.survey-text-wrap {
+  width: min(640px, 90vw);
+}
+
+.survey-question {
+  font-family: 'Special Elite', serif;
+  font-size: clamp(1.4rem, 3.5vw, 2rem);
+  color: var(--color-cream, #f0ece0);
+  margin: 0 0 1.25rem;
+  line-height: 1.3;
+}
+
+.survey-question--left { text-align: left; }
+
+.survey-text-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.survey-text-form textarea {
+  width: 100%;
+  background: var(--color-cream, #f0ece0);
+  border: 2px solid #333;
+  border-radius: 6px;
+  color: #111;
+  font-family: 'Courier Prime', monospace;
+  font-size: 1rem;
+  line-height: 1.7;
+  padding: 1rem 1.1rem;
+  resize: vertical;
+  min-height: 180px;
+  box-sizing: border-box;
+  transition: border-color 0.15s;
+}
+
+.survey-text-form textarea:focus {
+  outline: none;
+  border-color: #888;
+}
+
+.survey-text-form textarea::placeholder {
+  color: #888;
+}
+
+.survey-save-btn {
+  align-self: flex-start;
+  background: var(--color-cream, #f0ece0);
+  color: #111;
+  border: none;
+  border-radius: 6px;
+  font-family: 'Courier Prime', monospace;
+  font-size: 1rem;
+  font-weight: bold;
+  padding: 0.75rem 1.75rem;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
+}
+
+.survey-save-btn:hover {
+  background: #ddd8cc;
+  transform: translateY(-1px);
+}
+
+.survey-error {
+  font-family: 'Courier Prime', monospace;
+  font-size: 0.82rem;
+  color: #c0544a;
+  margin: 0;
+}
+
+.survey-counter {
+  font-family: 'Courier Prime', monospace;
+  font-size: 0.78rem;
+  color: #555;
+  letter-spacing: 0.08em;
+  margin-top: 1.5rem;
+}
+</style>
+{% endblock %}

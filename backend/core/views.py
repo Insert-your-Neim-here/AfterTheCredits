@@ -1,3 +1,5 @@
+from datetime import date
+
 from django.shortcuts import render
 
 from movies.services.tmdb_client import (
@@ -85,6 +87,7 @@ def home_view(request):
         "genre": genre,
         "runtime": runtime,
         "year": year,
+        "year_options": range(date.today().year, 1949, -1),
         "sort_by": sort_by,
         "active_tags": active_tags,
         "page": page,

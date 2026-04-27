@@ -1,3 +1,6 @@
+from datetime import date
+
+from django.contrib.auth.decorators import login_required
 from django.shortcuts import render
 
 from .services.tmdb_client import (
@@ -15,7 +18,11 @@ from .services.tmdb_client import (
 
 
 
-# Create your views here.
+def release_year_options():
+    return range(date.today().year, 1949, -1)
+
+
+@login_required
 def browse_view(request):
     q = request.GET.get("q", "").strip()
     genre = request.GET.get("genre", "").strip()
@@ -84,6 +91,7 @@ def browse_view(request):
         "genre": genre,
         "runtime": runtime,
         "year": year,
+        "year_options": release_year_options(),
         "sort_by": sort_by,
         "active_tags": active_tags,
         "page": page,

@@ -1,0 +1,320 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}My Journal — After The Credits{% endblock %}
+
+{% block content %}
+<section class="journal-page">
+
+  <div class="journal-header">
+    <h1 class="journal-header__title">My Journal</h1>
+    <p class="journal-header__sub">{{ entries|length }} entr{{ entries|length|pluralize:"y,ies" }}</p>
+  </div>
+
+  {% if entries %}
+    <ul class="entry-list">
+      {% for entry in entries %}
+        <li class="entry-card">
+
+          {# Left: poster #}
+          <div class="entry-card__poster-wrap">
+            {% if entry.movie.poster_path %}
+              <img src="{{ entry.movie.poster_url }}" alt="{{ entry.movie.title }}" class="entry-card__poster" loading="lazy">
+            {% else %}
+              <div class="entry-card__poster entry-card__poster--placeholder">No Image</div>
+            {% endif %}
+            <p class="entry-card__movie-name">{{ entry.movie.title }}</p>
+          </div>
+
+          {# Centre: survey icons + text #}
+          <div class="entry-card__body">
+            <div class="entry-card__scores">
+              {% for label, value in entry.survey_answers %}
+                <div class="score-item">
+                  <span class="score-item__label">{{ label }}</span>
+                  <img
+                    src="{% if value %}{% static 'media/clapper_yes.png' %}{% else %}{% static 'media/clapper_no.png' %}{% endif %}"
+                    alt="{{ label }}: {% if value %}Yes{% else %}No{% endif %}"
+                    class="score-item__icon {% if value %}score-item__icon--yes{% else %}score-item__icon--no{% endif %}"
+                    {% if value is None %}style="opacity:0.25"{% endif %}
+                  >
+                </div>
+              {% endfor %}
+            </div>
+
+            <div class="entry-card__text-box">
+              <p class="entry-card__excerpt">{{ entry.raw_text|default:"No written entry." }}</p>
+            </div>
+
+            <a href="{% url 'journal:edit' entry.id %}" class="entry-card__edit-link">Edit entry</a>
+          </div>
+
+          {# Right: date + delete #}
+          <div class="entry-card__sidebar">
+            <div class="entry-card__date-box">
+              <span class="entry-card__date-label">Date:</span>
+              <time class="entry-card__date" datetime="{{ entry.created_at|date:'Y-m-d' }}">
+                {{ entry.created_at|date:"Y/m/d" }}
+              </time>
+            </div>
+            <a href="{% url 'journal:delete' entry.id %}" class="entry-card__delete-btn">DELETE</a>
+          </div>
+
+        </li>
+      {% endfor %}
+    </ul>
+
+  {% else %}
+    <div class="journal-empty">
+      <p class="journal-empty__icon">📽</p>
+      <h2 class="journal-empty__heading">No entries yet</h2>
+      <p class="journal-empty__body">Start writing about films you've watched. Your entries shape your recommendations.</p>
+      <a href="{% url 'movies:browse' %}" class="btn btn--primary">Browse Films</a>
+    </div>
+  {% endif %}
+
+</section>
+
+<style>
+/* ── Page layout ──────────────────────────────────────────── */
+.journal-page {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 3rem 1.5rem 5rem;
+}
+
+.journal-header {
+  margin-bottom: 2.5rem;
+  border-bottom: 1px solid #2a2a2a;
+  padding-bottom: 1.25rem;
+}
+
+.journal-header__title {
+  font-family: 'Special Elite', serif;
+  font-size: 2rem;
+  color: var(--color-cream, #f0ece0);
+  margin: 0 0 0.2rem;
+}
+
+.journal-header__sub {
+  font-family: 'Courier Prime', monospace;
+  font-size: 0.82rem;
+  color: #666;
+  margin: 0;
+}
+
+/* ── Entry list ───────────────────────────────────────────── */
+.entry-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+/* ── Entry card ───────────────────────────────────────────── */
+.entry-card {
+  display: grid;
+  grid-template-columns: 180px 1fr 130px;
+  gap: 0;
+  background: #1c1c1c;
+  border: 1px solid #2e2e2e;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+/* Poster column */
+.entry-card__poster-wrap {
+  background: #e8e4d8;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-bottom: 0.5rem;
+}
+
+.entry-card__poster {
+  width: 100%;
+  aspect-ratio: 2/3;
+  object-fit: cover;
+  display: block;
+}
+
+.entry-card__poster--placeholder {
+  width: 100%;
+  aspect-ratio: 2/3;
+  background: #d0ccc0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Courier Prime', monospace;
+  font-size: 0.7rem;
+  color: #888;
+}
+
+.entry-card__movie-name {
+  font-family: 'Courier Prime', monospace;
+  font-size: 0.72rem;
+  color: #333;
+  text-align: center;
+  padding: 0.4rem 0.5rem 0;
+  margin: 0;
+  font-weight: bold;
+}
+
+/* Centre body */
+.entry-card__body {
+  padding: 1.1rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  border-right: 1px solid #2e2e2e;
+}
+
+/* Survey icon row */
+.entry-card__scores {
+  display: flex;
+  gap: 1.5rem;
+  align-items: flex-start;
+}
+
+.score-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.score-item__label {
+  font-family: 'Courier Prime', monospace;
+  font-size: 0.68rem;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.score-item__icon {
+  width: 38px;
+  height: auto;
+}
+
+/* Text excerpt box */
+.entry-card__text-box {
+  background: #f0ece0;
+  border-radius: 3px;
+  padding: 0.6rem 0.8rem;
+  flex: 1;
+}
+
+.entry-card__excerpt {
+  font-family: 'Courier Prime', monospace;
+  font-size: 0.8rem;
+  color: #333;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.entry-card__edit-link {
+  font-family: 'Courier Prime', monospace;
+  font-size: 0.75rem;
+  color: #888;
+  text-decoration: underline;
+  align-self: flex-start;
+  transition: color 0.15s;
+}
+.entry-card__edit-link:hover { color: var(--color-cream, #f0ece0); }
+
+/* Right sidebar */
+.entry-card__sidebar {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 0.75rem;
+}
+
+.entry-card__date-box {
+  background: #f0ece0;
+  border-radius: 3px;
+  padding: 0.5rem 0.75rem;
+  text-align: center;
+  width: 100%;
+}
+
+.entry-card__date-label {
+  display: block;
+  font-family: 'Courier Prime', monospace;
+  font-size: 0.7rem;
+  color: #555;
+  font-weight: bold;
+}
+
+.entry-card__date {
+  display: block;
+  font-family: 'Courier Prime', monospace;
+  font-size: 0.85rem;
+  color: #111;
+  font-weight: bold;
+  margin-top: 0.2rem;
+}
+
+.entry-card__delete-btn {
+  display: block;
+  width: 100%;
+  background: #f0ece0;
+  color: #111;
+  font-family: 'Courier Prime', monospace;
+  font-size: 0.78rem;
+  font-weight: bold;
+  letter-spacing: 0.06em;
+  text-align: center;
+  padding: 0.5rem;
+  border-radius: 3px;
+  text-decoration: none;
+  transition: background 0.15s, color 0.15s;
+}
+.entry-card__delete-btn:hover {
+  background: #c0544a;
+  color: #fff;
+}
+
+/* ── Empty state ──────────────────────────────────────────── */
+.journal-empty {
+  text-align: center;
+  padding: 5rem 1rem;
+  color: #666;
+}
+.journal-empty__icon { font-size: 3rem; margin-bottom: 1rem; }
+.journal-empty__heading {
+  font-family: 'Special Elite', serif;
+  font-size: 1.5rem;
+  color: var(--color-cream, #f0ece0);
+  margin-bottom: 0.75rem;
+}
+.journal-empty__body {
+  font-family: 'Courier Prime', monospace;
+  font-size: 0.9rem;
+  margin-bottom: 1.5rem;
+  max-width: 400px;
+  margin-left: auto;
+  margin-right: auto;
+  line-height: 1.6;
+}
+
+/* ── Responsive ───────────────────────────────────────────── */
+@media (max-width: 660px) {
+  .entry-card {
+    grid-template-columns: 110px 1fr;
+    grid-template-rows: auto auto;
+  }
+  .entry-card__sidebar {
+    grid-column: 1 / -1;
+    flex-direction: row;
+    border-top: 1px solid #2e2e2e;
+    padding: 0.75rem;
+  }
+  .entry-card__date-box { width: auto; }
+  .entry-card__delete-btn { width: auto; padding: 0.5rem 1rem; }
+}
+</style>
+{% endblock %}

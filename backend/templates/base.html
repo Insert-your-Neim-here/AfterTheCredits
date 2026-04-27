@@ -20,7 +20,7 @@
             <li><a href="{% url 'movies:browse' %}">Browse</a></li>
             <li><a href="#">About</a></li>
             {% if user.is_authenticated %}
-                <li><a href="#">Journal</a></li>
+                <li><a href="{% url 'journal:list' %}">Journal</a></li>
                 <li><a href="#">For You</a></li>
                 <li>
                     <form method="post" action="{% url 'users:logout' %}" style="display:inline">

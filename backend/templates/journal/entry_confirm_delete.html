@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Delete Entry — After The Credits{% endblock %}
+
+{% block content %}
+<section class="confirm-page">
+  <div class="confirm-card">
+    <h1 class="confirm-card__heading">Delete this entry?</h1>
+
+    <div class="confirm-card__film">
+      {% if movie.poster_path %}
+        <img src="{{ movie.poster_url }}" alt="{{ movie.title }}" class="confirm-card__poster">
+      {% endif %}
+      <div>
+        <p class="confirm-card__title">{{ movie.title }}</p>
+        {% if movie.release_date %}<p class="confirm-card__year">{{ movie.release_date|date:"Y" }}</p>{% endif %}
+        <p class="confirm-card__excerpt">{{ entry.raw_text|truncatechars:120 }}</p>
+      </div>
+    </div>
+
+    <p class="confirm-card__warning">
+      This cannot be undone. The entry will be removed from your journal and will no longer influence your recommendations.
+    </p>
+
+    <div class="confirm-card__actions">
+      <form method="post">
+        {% csrf_token %}
+        <button type="submit" class="btn-delete">DELETE</button>
+      </form>
+      <a href="{% url 'journal:list' %}" class="btn-cancel">Cancel</a>
+    </div>
+  </div>
+</section>
+
+<style>
+.confirm-page { display: flex; justify-content: center; padding: 5rem 1.5rem; }
+.confirm-card {
+  background: #1a1a1a; border: 1px solid #333; border-top: 3px solid #c0544a;
+  border-radius: 4px; max-width: 500px; width: 100%; padding: 2rem;
+}
+.confirm-card__heading {
+  font-family: 'Special Elite', serif; font-size: 1.4rem;
+  color: var(--color-cream, #f0ece0); margin: 0 0 1.5rem;
+}
+.confirm-card__film { display: flex; gap: 1rem; margin-bottom: 1.5rem; padding-bottom: 1.5rem; border-bottom: 1px solid #2a2a2a; }
+.confirm-card__poster { width: 60px; height: 90px; object-fit: cover; border-radius: 2px; flex-shrink: 0; }
+.confirm-card__title { font-family: 'Special Elite', serif; font-size: 1rem; color: var(--color-cream, #f0ece0); margin: 0 0 0.2rem; }
+.confirm-card__year  { font-family: 'Courier Prime', monospace; font-size: 0.75rem; color: #666; margin: 0 0 0.4rem; }
+.confirm-card__excerpt { font-family: 'Courier Prime', monospace; font-size: 0.8rem; color: #888; line-height: 1.5; margin: 0; }
+.confirm-card__warning { font-family: 'Courier Prime', monospace; font-size: 0.85rem; color: #c0544a; margin: 0 0 1.5rem; line-height: 1.6; }
+.confirm-card__actions { display: flex; align-items: center; gap: 1rem; }
+.btn-delete {
+  background: #f0ece0; color: #111; border: none; border-radius: 3px;
+  font-family: 'Courier Prime', monospace; font-size: 0.85rem; font-weight: bold;
+  letter-spacing: 0.06em; padding: 0.55rem 1.4rem; cursor: pointer; transition: background 0.15s;
+}
+.btn-delete:hover { background: #c0544a; color: #fff; }
+.btn-cancel { font-family: 'Courier Prime', monospace; font-size: 0.85rem; color: #666; text-decoration: underline; transition: color 0.15s; }
+.btn-cancel:hover { color: var(--color-cream, #f0ece0); }
+</style>
+{% endblock %}

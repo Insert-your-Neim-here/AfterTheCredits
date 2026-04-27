@@ -21,18 +21,6 @@
       {% else %}
         <div class="movie-poster-placeholder">NO POSTER</div>
       {% endif %}
-
-      <!-- Wishlist button -->
-      {% if user.is_authenticated %}
-        <form method="post" action="{% url 'movies:toggle_wishlist' movie.tmdb_id %}">
-          {% csrf_token %}
-          <button type="submit" class="btn btn-block {% if in_wishlist %}btn-secondary{% else %}btn-primary{% endif %}">
-            {% if in_wishlist %}✓ In Wishlist{% else %}+ Add to Wishlist{% endif %}
-          </button>
-        </form>
-      {% else %}
-        <a href="{% url 'users:login' %}" class="btn btn-primary btn-block">Log in to Wishlist</a>
-      {% endif %}
     </aside>
 
     <!-- Details -->
@@ -68,9 +56,7 @@
           <h3 class="streaming-heading">STREAM ON</h3>
           <div class="streaming-logos">
             {% for platform in movie.streaming_platforms %}
-              <!-- <div class="streaming-badge" title="{{ platform }}"> -->
-                <span class="streaming-name">{{ platform }}</span>
-              </div>
+              <span class="streaming-name">{{ platform }}</span>
             {% endfor %}
           </div>
         </div>
@@ -81,7 +67,7 @@
         <div class="journal-cta">
           <h3>SEEN IT?</h3>
           <p>Add this to your journal and get smarter recommendations.</p>
-          <a href="{% url 'journal:create' %}?movie={{ movie.tmdb_id }}" class="btn btn-primary">
+          <a href="{% url 'journal:create' movie.id %}" class="btn btn-primary">
             Write a Journal Entry
           </a>
         </div>

@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Edit Entry — After The Credits{% endblock %}
+
+{% block content %}
+<section class="edit-page">
+
+  {# Film strip at top #}
+  <div class="film-context">
+    {% if movie.backdrop_path %}
+      <div class="film-context__backdrop" style="background-image: url('{{ movie.backdrop_url }}');"></div>
+    {% endif %}
+    <div class="film-context__overlay"></div>
+    <div class="film-context__inner">
+      {% if movie.poster_path %}
+        <img src="{{ movie.poster_url }}" alt="{{ movie.title }}" class="film-context__poster">
+      {% endif %}
+      <div>
+        <p class="film-context__label">Editing entry for</p>
+        <h1 class="film-context__title">{{ movie.title }}</h1>
+        {% if movie.release_date %}<span class="film-context__year">{{ movie.release_date|date:"Y" }}</span>{% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="edit-form-wrap">
+    <form method="post" class="edit-form" novalidate>
+      {% csrf_token %}
+
+      {# Survey fields #}
+      {% for field in form %}
+        {% if field.name != "raw_text" %}
+          <fieldset class="edit-fieldset">
+            <legend class="edit-legend">{{ field.label }}</legend>
+            <div class="edit-choices">
+              {% for choice in field %}
+                <label class="edit-choice {% if choice.data.value == 'true' %}edit-choice--yes{% else %}edit-choice--no{% endif %}">
+                  {{ choice.tag }}
+                  <img
+                    src="{% if choice.data.value == 'true' %}{% static 'media/clapper_yes.png' %}{% else %}{% static 'media/clapper_no.png' %}{% endif %}"
+                    alt="{{ choice.choice_label }}"
+                    class="edit-choice__img"
+                  >
+                  <span class="edit-choice__label">{{ choice.choice_label }}</span>
+                </label>
+              {% endfor %}
+            </div>
+            {% if field.errors %}<p class="form-error">{{ field.errors|join:", " }}</p>{% endif %}
+          </fieldset>
+        {% endif %}
+      {% endfor %}
+
+      {# Text field #}
+      <div class="edit-field">
+        <label class="edit-label" for="{{ form.raw_text.id_for_label }}">{{ form.raw_text.label }}</label>
+        {{ form.raw_text }}
+        {% if form.raw_text.errors %}<p class="form-error">{{ form.raw_text.errors|join:", " }}</p>{% endif %}
+      </div>
+
+      <div class="edit-actions">
+        <button type="submit" class="btn btn--primary">Save Changes</button>
+        <a href="{% url 'journal:list' %}" class="edit-cancel">Cancel</a>
+      </div>
+
+    </form>
+  </div>
+
+</section>
+
+<style>
+.film-context {
+  position: relative; height: 200px; overflow: hidden; background: #0d0d0d;
+}
+.film-context__backdrop {
+  position: absolute; inset: 0;
+  background-size: cover; background-position: center 30%;
+  filter: blur(2px) brightness(0.35); transform: scale(1.04);
+}
+.film-context__overlay {
+  position: absolute; inset: 0;
+  background: linear-gradient(to bottom, transparent 20%, #111 100%);
+}
+.film-context__inner {
+  position: relative; z-index: 1;
+  display: flex; align-items: flex-end; gap: 1.25rem;
+  height: 100%; max-width: 760px; margin: 0 auto;
+  padding: 0 1.5rem 1.5rem;
+}
+.film-context__poster {
+  width: 65px; height: 97px; object-fit: cover;
+  border-radius: 2px; box-shadow: 0 4px 16px rgba(0,0,0,0.6); flex-shrink: 0;
+}
+.film-context__label { font-family: 'Courier Prime', monospace; font-size: 0.72rem; color: #888; text-transform: uppercase; letter-spacing: 0.08em; margin: 0 0 0.25rem; }
+.film-context__title { font-family: 'Special Elite', serif; font-size: 1.6rem; color: var(--color-cream, #f0ece0); margin: 0 0 0.2rem; }
+.film-context__year  { font-family: 'Courier Prime', monospace; font-size: 0.78rem; color: #777; }
+
+.edit-form-wrap {
+  max-width: 760px; margin: 0 auto; padding: 2.5rem 1.5rem 5rem;
+}
+.edit-form { display: flex; flex-direction: column; gap: 2rem; }
+
+.edit-fieldset { border: none; padding: 0; margin: 0; }
+.edit-legend {
+  font-family: 'Special Elite', serif; font-size: 0.95rem;
+  color: var(--color-cream, #f0ece0); margin-bottom: 0.9rem;
+}
+
+.edit-choices { display: flex; gap: 1.5rem; }
+
+.edit-choice {
+  display: flex; flex-direction: column; align-items: center; gap: 0.5rem;
+  cursor: pointer; padding: 0.75rem 1rem;
+  border: 1px solid #333; border-radius: 4px;
+  background: #1a1a1a; transition: border-color 0.15s, background 0.15s;
+}
+.edit-choice input[type="radio"] { display: none; }
+
+.edit-choice--yes:has(input:checked),
+.edit-choice--yes:hover { border-color: #7aad6e; background: rgba(122,173,110,0.08); }
+
+.edit-choice--no:has(input:checked),
+.edit-choice--no:hover { border-color: #c0544a; background: rgba(192,84,74,0.08); }
+
+.edit-choice__img { width: 50px; height: auto; }
+.edit-choice__label {
+  font-family: 'Courier Prime', monospace; font-size: 0.82rem; color: #aaa;
+}
+
+.edit-field { display: flex; flex-direction: column; gap: 0.5rem; }
+.edit-label { font-family: 'Special Elite', serif; font-size: 0.95rem; color: var(--color-cream, #f0ece0); }
+.edit-form textarea {
+  width: 100%; background: #1a1a1a; border: 1px solid #333; border-radius: 3px;
+  color: var(--color-cream, #f0ece0); font-family: 'Courier Prime', monospace;
+  font-size: 0.92rem; line-height: 1.7; padding: 0.9rem 1rem; resize: vertical;
+  box-sizing: border-box; transition: border-color 0.15s;
+}
+.edit-form textarea:focus { outline: none; border-color: #666; }
+
+.edit-actions { display: flex; align-items: center; gap: 1.25rem; }
+.edit-cancel {
+  font-family: 'Courier Prime', monospace; font-size: 0.85rem; color: #666;
+  text-decoration: underline; transition: color 0.15s;
+}
+.edit-cancel:hover { color: var(--color-cream, #f0ece0); }
+.form-error { font-family: 'Courier Prime', monospace; font-size: 0.8rem; color: #c0544a; margin: 0.25rem 0 0; }
+</style>
+{% endblock %}

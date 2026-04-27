@@ -49,6 +49,15 @@
       <option value="medium" {% if runtime == "medium" %}selected{% endif %}>90-120 min</option>
       <option value="long" {% if runtime == "long" %}selected{% endif %}>Over 120 min</option>
     </select>
+
+    <select class="filter-select" name="year" aria-label="Filter by release year" onchange="this.form.submit()">
+      <option value="">Year</option>
+      {% for option in year_options %}
+        <option value="{{ option }}" {% if year == option|stringformat:"s" %}selected{% endif %}>
+          {{ option }}
+        </option>
+      {% endfor %}
+    </select>
   </div>
 </form>
 

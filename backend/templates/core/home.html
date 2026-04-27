@@ -164,13 +164,18 @@
     .search-section {
       background: var(--near-black);
       padding: 32px 32px 24px;
-      display: grid;
-      grid-template-columns: 1fr 180px;
-      gap: 24px;
-      align-items: start;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px 24px;
+      align-items: flex-start;
     }
 
-    .search-left { display: flex; flex-direction: column; gap: 16px; }
+    .search-left {
+      display: flex;
+      flex: 0 1 auto;
+      flex-direction: column;
+      gap: 16px;
+    }
 
     /* Search row */
     .search-row { display: flex; }
@@ -273,7 +278,9 @@
     /* Filter column */
     .filter-col {
       display: flex;
-      flex-direction: column;
+      flex: 1 1 420px;
+      flex-direction: row;
+      flex-wrap: wrap;
       gap: 10px;
     }
 
@@ -296,7 +303,7 @@
     .filter-btn:hover { background: var(--cream3); }
 
     .filter-select {
-      width: 100%;
+      width: 150px;
       height: 38px;
       background: var(--cream);
       color: var(--black);
@@ -403,7 +410,9 @@
     }
     @media (max-width: 650px) {
       .movie-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-      .search-section { grid-template-columns: 1fr; }
+      .search-section { flex-direction: column; }
+      .filter-col { width: 100%; }
+      .filter-select { width: min(100%, 180px); }
       .hero { flex-direction: column; align-items: flex-start; }
     }
   </style>
@@ -502,6 +511,15 @@
       <option value="short" {% if runtime == "short" %}selected{% endif %}>Under 90 min</option>
       <option value="medium" {% if runtime == "medium" %}selected{% endif %}>90-120 min</option>
       <option value="long" {% if runtime == "long" %}selected{% endif %}>Over 120 min</option>
+    </select>
+
+    <select class="filter-select" name="year" aria-label="Filter by release year" onchange="this.form.submit()">
+      <option value="">Year</option>
+      {% for option in year_options %}
+        <option value="{{ option }}" {% if year == option|stringformat:"s" %}selected{% endif %}>
+          {{ option }}
+        </option>
+      {% endfor %}
     </select>
   </div>
 </form>
