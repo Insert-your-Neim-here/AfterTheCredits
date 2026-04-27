@@ -1,27 +1,152 @@
 {% extends "base.html" %}
 {% block content %}
 
-<form class="controls" method="get" action="{% url 'movies:browse' %}">
-  <input class="input" name="q" value="{{ q|default:'' }}" placeholder=" " />
-  <button class="btn" type="submit">Search</button>
+<form class="search-section" id="browse-search-form" method="GET" action="{% url 'movies:browse' %}">
+  <div class="search-left">
+    <div class="search-row">
+      <input
+        class="search-input"
+        type="text"
+        name="q"
+        value="{{ q|default:'' }}"
+        autocomplete="off"
+        aria-label="Search movies"
+      />
+      <button class="btn-search" type="submit">Search</button>
+    </div>
+
+    <div>
+      <div class="tags-label">Tags</div>
+      <div class="tag-input-row">
+        <input class="tag-input" type="text" id="tag-input" autocomplete="off" aria-label="Add tag" />
+        <button class="btn-add" type="button" onclick="addTag()">Add</button>
+      </div>
+      <div class="chips" id="chips-container">
+        {% for tag in active_tags %}
+        <span class="chip">
+          {{ tag }}
+          <span class="chip-remove" onclick="removeChip(this)">x</span>
+          <input type="hidden" name="tags" value="{{ tag }}" />
+        </span>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <div class="filter-col">
+    <select class="filter-select" name="genre" aria-label="Filter by genre" onchange="this.form.submit()">
+      <option value="">Genres</option>
+      {% for option in genres %}
+        <option value="{{ option.id }}" {% if genre == option.id|stringformat:"s" %}selected{% endif %}>
+          {{ option.name }}
+        </option>
+      {% endfor %}
+    </select>
+
+    <select class="filter-select" name="runtime" aria-label="Filter by runtime" onchange="this.form.submit()">
+      <option value="">Runtime</option>
+      <option value="short" {% if runtime == "short" %}selected{% endif %}>Under 90 min</option>
+      <option value="medium" {% if runtime == "medium" %}selected{% endif %}>90-120 min</option>
+      <option value="long" {% if runtime == "long" %}selected{% endif %}>Over 120 min</option>
+    </select>
+  </div>
 </form>
 
-
-<!-- ═══ MOVIE GRID ═══ -->
+<div class="grid-section">
   <div class="movie-grid">
     {% for movie in movies %}
       <a class="movie-card" href="{% url 'movies:details' movie.id %}">
-        <div class="movie-card__poster">
+        <div class="movie-poster">
           {% if movie.poster_url %}
-             <img src="{{ movie.poster_url }}" alt="{{ movie.title }}" loading="lazy">
+            <img src="{{ movie.poster_url }}" alt="{{ movie.title }}" loading="lazy">
           {% else %}
             Movie poster
           {% endif %}
         </div>
-        <div class="movie-card__title">{{ movie.title }}</div>
+        <div class="movie-name">{{ movie.title }}</div>
       </a>
     {% endfor %}
   </div>
+</div>
 
+<div class="pagination">
+  {% if previous_page_url %}
+    <a href="{{ previous_page_url }}">
+      <button class="btn-page">Previous</button>
+    </a>
+  {% else %}
+    <button class="btn-page" disabled>Previous</button>
+  {% endif %}
 
+  <span class="page-label">Page: {{ page|default:"1" }}</span>
+
+  {% if next_page_url %}
+    <a href="{{ next_page_url }}">
+      <button class="btn-page">Next</button>
+    </a>
+  {% else %}
+    <button class="btn-page" disabled>Next</button>
+  {% endif %}
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  const browseSearchForm = document.getElementById("browse-search-form");
+  const tagInput = document.getElementById("tag-input");
+  const chipsContainer = document.getElementById("chips-container");
+
+  function addTag() {
+    const tag = tagInput.value.trim();
+    if (!tag) return;
+
+    const existingTags = Array.from(
+      chipsContainer.querySelectorAll('input[name="tags"]')
+    ).map((input) => input.value.toLowerCase());
+
+    if (!existingTags.includes(tag.toLowerCase())) {
+      const chip = document.createElement("span");
+      const removeButton = document.createElement("span");
+      const hiddenInput = document.createElement("input");
+
+      chip.className = "chip";
+      chip.appendChild(document.createTextNode(tag));
+
+      removeButton.className = "chip-remove";
+      removeButton.textContent = "x";
+      removeButton.addEventListener("click", () => removeChip(removeButton));
+      chip.appendChild(removeButton);
+
+      hiddenInput.type = "hidden";
+      hiddenInput.name = "tags";
+      hiddenInput.value = tag;
+      chip.appendChild(hiddenInput);
+
+      chipsContainer.appendChild(chip);
+    }
+
+    tagInput.value = "";
+    browseSearchForm.submit();
+  }
+
+  function removeChip(removeButton) {
+    removeButton.closest(".chip").remove();
+    browseSearchForm.submit();
+  }
+
+  tagInput.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      addTag();
+    }
+  });
+
+  browseSearchForm.addEventListener("submit", (event) => {
+    if (tagInput.value.trim()) {
+      event.preventDefault();
+      addTag();
+    }
+  });
+</script>
 {% endblock %}

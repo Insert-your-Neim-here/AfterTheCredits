@@ -8,32 +8,26 @@
     <link rel="stylesheet" href="{% static 'stylesheet.css' %}">
 </head>
 <body>
-
-
-
-
-
-<body>
 <div class="auth-page">
-    <div class="auth-card">
-        <div class="auth-card_logo_container">
-        <div class="auth-card__logo">
-        <a href="{% url 'core:home' %}" class="navbar__logo">
-            <img src="{% static 'media/Logo.png' %}" alt="After The Credits">
-        </a>
-        </div>
-        </div>
-        <h1 class="auth-card__title">Create account</h1>
-        <p class="auth-card__subtitle">Join to get personalised movie recommendations.</p>
+    <form method="post" novalidate class="form-light signup-form">
+        {% csrf_token %}
 
-        {% if form.non_field_errors %}
-            <div class="non-field-errors">
-                {% for error in form.non_field_errors %}{{ error }}{% endfor %}
+        <div class="auth-card signup-form__details">
+            <div class="auth-card_logo_container">
+            <div class="auth-card__logo">
+            <a href="{% url 'core:home' %}" class="navbar__logo">
+                <img src="{% static 'media/Logo.png' %}" alt="After The Credits">
+            </a>
             </div>
-        {% endif %}
+            </div>
+            <h1 class="auth-card__title">Create account</h1>
+            <p class="auth-card__subtitle">Join to get personalised movie recommendations.</p>
 
-        <form method="post" novalidate class="form-light">
-            {% csrf_token %}
+            {% if form.non_field_errors %}
+                <div class="non-field-errors">
+                    {% for error in form.non_field_errors %}{{ error }}{% endfor %}
+                </div>
+            {% endif %}
 
             <div class="form-group">
                 <label for="{{ form.email.id_for_label }}">Email</label>
@@ -68,12 +62,112 @@
             <button type="submit" class="btn btn-dark" style="width:100%; margin-top: 8px;">
                 Sign Up
             </button>
-        </form>
 
-        <p class="auth-card__footer">
-            Already have an account? <a href="{% url 'users:login' %}">Log in</a>
-        </p>
-    </div>
+            <p class="auth-card__footer">
+                Already have an account? <a href="{% url 'users:login' %}">Log in</a>
+            </p>
+        </div>
+
+        <div class="streaming-card">
+            <h2 class="streaming-card__title">Your streaming services</h2>
+            <p class="auth-card__subtitle">Pick the UK platforms you already have.</p>
+
+            <div class="form-group">
+                <label for="platform-select">Streaming platforms</label>
+                {% if form.streaming_platforms.field.queryset %}
+                    <select class="platform-select" id="platform-select" aria-label="Add streaming platform">
+                        <option value="">Choose a platform</option>
+                        {% for platform in form.streaming_platforms.field.queryset %}
+                            <option value="{{ platform.id }}">{{ platform.name }}</option>
+                        {% endfor %}
+                    </select>
+
+                    <div class="chips platform-chips" id="platform-chips">
+                        {% for platform in form.streaming_platforms.field.queryset %}
+                            {% if platform.id|stringformat:"s" in selected_streaming_platform_ids %}
+                                <span class="chip" data-platform-id="{{ platform.id }}">
+                                    {{ platform.name }}
+                                    <span class="chip-remove" onclick="removePlatformChip(this)">x</span>
+                                    <input type="hidden" name="streaming_platforms" value="{{ platform.id }}">
+                                </span>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <p class="platform-dropdown__empty">
+                        Streaming platforms will appear here after the UK provider list is synced.
+                    </p>
+                {% endif %}
+                {% if form.streaming_platforms.errors %}
+                    <ul class="form-errors">
+                        {% for e in form.streaming_platforms.errors %}<li>{{ e }}</li>{% endfor %}
+                    </ul>
+                {% endif %}
+            </div>
+        </div>
+    </form>
 </div>
+
+<script>
+    const platformSelect = document.getElementById("platform-select");
+    const platformChips = document.getElementById("platform-chips");
+
+    function syncPlatformOptions() {
+        if (!platformSelect || !platformChips) return;
+
+        const selectedIds = Array.from(
+            platformChips.querySelectorAll('input[name="streaming_platforms"]')
+        ).map((input) => input.value);
+
+        Array.from(platformSelect.options).forEach((option) => {
+            option.disabled = option.value && selectedIds.includes(option.value);
+        });
+    }
+
+    function addPlatformChip() {
+        if (!platformSelect || !platformSelect.value) return;
+
+        const selectedOption = platformSelect.options[platformSelect.selectedIndex];
+        const platformId = selectedOption.value;
+        const platformName = selectedOption.text;
+
+        if (platformChips.querySelector(`input[value="${platformId}"]`)) {
+            platformSelect.value = "";
+            return;
+        }
+
+        const chip = document.createElement("span");
+        const removeButton = document.createElement("span");
+        const hiddenInput = document.createElement("input");
+
+        chip.className = "chip";
+        chip.dataset.platformId = platformId;
+        chip.appendChild(document.createTextNode(platformName));
+
+        removeButton.className = "chip-remove";
+        removeButton.textContent = "x";
+        removeButton.addEventListener("click", () => removePlatformChip(removeButton));
+        chip.appendChild(removeButton);
+
+        hiddenInput.type = "hidden";
+        hiddenInput.name = "streaming_platforms";
+        hiddenInput.value = platformId;
+        chip.appendChild(hiddenInput);
+
+        platformChips.appendChild(chip);
+        platformSelect.value = "";
+        syncPlatformOptions();
+    }
+
+    function removePlatformChip(removeButton) {
+        removeButton.closest(".chip").remove();
+        syncPlatformOptions();
+    }
+
+    if (platformSelect) {
+        platformSelect.addEventListener("change", addPlatformChip);
+        syncPlatformOptions();
+    }
+</script>
 
 </body>

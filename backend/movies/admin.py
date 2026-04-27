@@ -1,20 +1,23 @@
 from django.contrib import admin
-
-# Register your models here.
-from django.contrib import admin
-from .models import Movie, Genre, StreamingPlatform, Wishlist
+from .models import Movie, Genre, Keyword, StreamingPlatform, Wishlist
 
 
 @admin.register(Movie)
 class MovieAdmin(admin.ModelAdmin):
     list_display = ['title', 'release_date', 'runtime', 'vote_average']
-    search_fields = ['title']
-    list_filter = ['genres', 'streaming_platforms']
+    search_fields = ['title', 'keywords__name']
+    list_filter = ['genres', 'keywords', 'streaming_platforms']
 
 
 @admin.register(Genre)
 class GenreAdmin(admin.ModelAdmin):
     list_display = ['name', 'tmdb_id']
+
+
+@admin.register(Keyword)
+class KeywordAdmin(admin.ModelAdmin):
+    list_display = ['name', 'tmdb_id']
+    search_fields = ['name']
 
 
 @admin.register(StreamingPlatform)

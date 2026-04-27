@@ -2,11 +2,15 @@ from django.shortcuts import render
 
 from .services.tmdb_client import (
     _tmdb_get,
+    attach_streaming_platforms,
     discover_movies,
+    fetch_movie_watch_providers,
     get_genres,
     popular_movies,
     poster_url,
+    search_keyword_ids,
     search_movies,
+    store_loaded_movies,
 )
 
 
@@ -18,6 +22,11 @@ def browse_view(request):
     runtime = request.GET.get("runtime", "").strip()
     year = request.GET.get("year", "").strip()
     sort_by = request.GET.get("sort_by", "popularity.desc").strip()
+    active_tags = [
+        tag.strip()
+        for tag in request.GET.getlist("tags")
+        if tag.strip()
+    ]
     page = request.GET.get("page", "1").strip()
 
     try:
@@ -26,23 +35,47 @@ def browse_view(request):
         page = 1
 
     genres = get_genres()
+    keyword_ids = search_keyword_ids(active_tags) if active_tags else []
+    has_discovery_filters = bool(
+        genre or runtime or year or keyword_ids or sort_by != "popularity.desc"
+    )
+    used_search = q and not has_discovery_filters
 
-    if q:
-        movies = search_movies(q, page=page)
-    elif genre or runtime or year or sort_by != "popularity.desc":
+    if used_search:
+        movies = search_movies(q, page=page, uk_only=True)
+    elif q or has_discovery_filters:
         movies = discover_movies(
             page=page,
             genre=genre,
             runtime=runtime,
             year=year,
+            text_query=q,
+            keyword_ids=keyword_ids,
             sort_by=sort_by,
             uk_only=True,
         )
     else:
         movies = popular_movies(page=page, uk_only=True)
 
+    if not used_search:
+        movies = attach_streaming_platforms(movies)
+
     for movie in movies:
         movie["poster_url"] = poster_url(movie.get("poster_path"))
+
+    store_loaded_movies(movies)
+
+    previous_page_url = None
+    if page > 1:
+        previous_params = request.GET.copy()
+        previous_params["page"] = page - 1
+        previous_page_url = f"?{previous_params.urlencode()}"
+
+    next_page_url = None
+    if len(movies) == 20:
+        next_params = request.GET.copy()
+        next_params["page"] = page + 1
+        next_page_url = f"?{next_params.urlencode()}"
 
     context = {
         "movies": movies,
@@ -52,7 +85,10 @@ def browse_view(request):
         "runtime": runtime,
         "year": year,
         "sort_by": sort_by,
+        "active_tags": active_tags,
         "page": page,
+        "previous_page_url": previous_page_url,
+        "next_page_url": next_page_url,
         "active_page": "browse",
     }
 
@@ -65,6 +101,7 @@ def movie_detail_view(request, tmdb_id):
 
     movie["poster_url"] = poster_url(movie.get("poster_path"))
     movie["backdrop_url"] = poster_url(movie.get("backdrop_path"))
+    movie["streaming_platforms"] = fetch_movie_watch_providers(tmdb_id)
 
     context = {
         "movie": movie,

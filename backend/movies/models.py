@@ -17,6 +17,17 @@ class Genre(models.Model):
         return self.name
 
 
+class Keyword(models.Model):
+    tmdb_id = models.IntegerField(unique=True)
+    name = models.CharField(max_length=100)
+
+    class Meta:
+        ordering = ["name"]
+
+    def __str__(self):
+        return self.name
+
+
 class Movie(models.Model):
     tmdb_id = models.IntegerField(unique=True)
     title = models.CharField(max_length=255)
@@ -29,6 +40,7 @@ class Movie(models.Model):
     vote_count = models.IntegerField(default=0)
     popularity = models.FloatField(default=0)
     genres = models.ManyToManyField(Genre, blank=True)
+    keywords = models.ManyToManyField(Keyword, blank=True)
     streaming_platforms = models.ManyToManyField(
         StreamingPlatform,
         blank=True,

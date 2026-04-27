@@ -51,10 +51,10 @@
         {% endif %}
       </div>
 
-      {% if movie.genres.all %}
+      {% if movie.genres %}
         <div class="movie-genres-row">
-          {% for genre in movie.genres.all %}
-            <a href="{% url 'core:browse' %}?genre={{ genre.name }}" class="tag tag-genre">{{ genre.name }}</a>
+          {% for genre in movie.genres %}
+            <a href="{% url 'movies:browse' %}?genre={{ genre.id }}" class="tag tag-genre">{{ genre.name }}</a>
           {% endfor %}
         </div>
       {% endif %}
@@ -63,17 +63,13 @@
         <p class="movie-overview">{{ movie.overview }}</p>
       {% endif %}
 
-      {% if movie.streaming_platforms.all %}
+      {% if movie.streaming_platforms %}
         <div class="streaming-section">
           <h3 class="streaming-heading">STREAM ON</h3>
           <div class="streaming-logos">
-            {% for platform in movie.streaming_platforms.all %}
-              <div class="streaming-badge" title="{{ platform.name }}">
-                {% if platform.logo_url %}
-                  <img src="{{ platform.logo_url }}" alt="{{ platform.name }}" class="streaming-logo">
-                {% else %}
-                  <span class="streaming-name">{{ platform.name }}</span>
-                {% endif %}
+            {% for platform in movie.streaming_platforms %}
+              <!-- <div class="streaming-badge" title="{{ platform }}"> -->
+                <span class="streaming-name">{{ platform }}</span>
               </div>
             {% endfor %}
           </div>

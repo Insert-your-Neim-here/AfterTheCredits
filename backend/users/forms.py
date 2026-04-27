@@ -2,6 +2,7 @@
 from django import forms
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
+from movies.models import StreamingPlatform
 
 User = get_user_model()
 
@@ -16,6 +17,15 @@ class SignupForm(forms.Form):
     confirm_password = forms.CharField(
         widget=forms.PasswordInput(attrs={'placeholder': 'Confirm password', 'autocomplete': 'new-password'})
     )
+    streaming_platforms = forms.ModelMultipleChoiceField(
+        queryset=StreamingPlatform.objects.none(),
+        required=False,
+        widget=forms.CheckboxSelectMultiple,
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['streaming_platforms'].queryset = StreamingPlatform.objects.order_by('name')
 
     def clean_email(self):
         email = self.cleaned_data['email'].lower()

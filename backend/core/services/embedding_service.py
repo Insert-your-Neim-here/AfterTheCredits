@@ -16,6 +16,12 @@ def compute_embedding(text: str) -> list[float]:
     return vec.tolist()
 
 
-def build_movie_text(title: str, overview: str, genres: list[str]) -> str:
+def build_movie_text(
+    title: str,
+    overview: str,
+    genres: list[str],
+    keywords: list[str] | None = None,
+) -> str:
     genre_str = ", ".join(genres) if genres else "Unknown"
-    return f"{title}. {overview} Genres: {genre_str}."
+    keyword_str = ", ".join(keywords) if keywords else "Unknown"
+    return f"{title}. {overview} Genres: {genre_str}. Keywords: {keyword_str}."

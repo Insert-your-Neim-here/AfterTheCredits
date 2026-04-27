@@ -23,15 +23,29 @@ def signup_view(request):
     if request.method == 'POST' and form.is_valid():
         email = form.cleaned_data['email']
         password = form.cleaned_data['password']
+        streaming_platform_ids = [
+            platform.id for platform in form.cleaned_data['streaming_platforms']
+        ]
 
         # Store credentials in session until email is verified
-        request.session['pending_signup'] = {'email': email, 'password': password}
+        request.session['pending_signup'] = {
+            'email': email,
+            'password': password,
+            'streaming_platform_ids': streaming_platform_ids,
+        }
 
         send_verification_email(email)
         messages.success(request, f'A verification code has been sent to {email}.')
         return redirect('users:verify_email')
 
-    return render(request, 'users/signup.html', {'form': form})
+    selected_streaming_platform_ids = []
+    if request.method == 'POST':
+        selected_streaming_platform_ids = request.POST.getlist('streaming_platforms')
+
+    return render(request, 'users/signup.html', {
+        'form': form,
+        'selected_streaming_platform_ids': selected_streaming_platform_ids,
+    })
 
 
 @require_http_methods(['GET', 'POST'])
@@ -54,6 +68,7 @@ def verify_email_view(request):
                 password=pending['password'],
                 is_email_verified=True,
             )
+            user.streaming_platforms.set(pending.get('streaming_platform_ids', []))
             del request.session['pending_signup']
             login(request, user, backend='django.contrib.auth.backends.ModelBackend')
             messages.success(request, 'Email verified! Welcome to After The Credits.')
