@@ -23,8 +23,6 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
-from django.db import transaction
-from django.db.models import QuerySet
 from pgvector.django import CosineDistance
 
 from journal.models import JournalEntry
@@ -257,11 +255,13 @@ def _build_explanation(
     return explanation, snippet
 
 
-def generate_recommendations(user: "User") -> QuerySet[Recommendation]:
+def generate_recommendations(user: "User") -> list[Recommendation]:
     """
-    Full pipeline: profile -> candidates -> re-rank -> save -> return.
-    Returns an empty queryset if the user has no journal entries with embeddings.
+    Full pipeline: profile -> candidates -> re-rank -> return.
+    Returns an empty list if the user has no journal entries with embeddings.
     """
+    Recommendation.objects.filter(user=user).delete()
+
     entries = list(
         JournalEntry.objects.filter(user=user, movie__isnull=False)
         .select_related("movie")
@@ -269,13 +269,12 @@ def generate_recommendations(user: "User") -> QuerySet[Recommendation]:
     )
 
     if len(entries) < MIN_JOURNAL_ENTRIES:
-        Recommendation.objects.filter(user=user).delete()
-        return Recommendation.objects.none()
+        return []
 
     # 1. Read the persisted profile embedding, refreshing it if needed.
     profile_vector = user.profile_embedding or update_user_profile_embedding(user)
     if not profile_vector:
-        return Recommendation.objects.none()
+        return []
 
     # 2. Fetch candidate movies via pgvector cosine similarity.
     excluded_ids = _journalled_movie_ids(entries)
@@ -432,42 +431,35 @@ def generate_recommendations(user: "User") -> QuerySet[Recommendation]:
     scored.sort(key=lambda item: item[0], reverse=True)
     top = scored[:TOP_N]
 
-    # 4. Persist recommendations, replacing the previous batch.
-    with transaction.atomic():
-        Recommendation.objects.filter(user=user).delete()
-        recs = []
-        for score, movie in top:
-            explanation, snippet = _build_explanation(
-                movie,
-                liked_genres,
-                entry_map,
-                director_ids=explanation_director_ids,
-                producer_ids=explanation_producer_ids,
-                writer_ids=explanation_writer_ids,
-                actor_ids=explanation_actor_ids,
+    # 4. Build unsaved recommendation objects for display.
+    recs = []
+    for score, movie in top:
+        explanation, snippet = _build_explanation(
+            movie,
+            liked_genres,
+            entry_map,
+            director_ids=explanation_director_ids,
+            producer_ids=explanation_producer_ids,
+            writer_ids=explanation_writer_ids,
+            actor_ids=explanation_actor_ids,
+        )
+        recs.append(
+            Recommendation(
+                user=user,
+                movie=movie,
+                score=round(score, 4),
+                explanation=explanation,
+                journal_snippet=snippet,
             )
-            recs.append(
-                Recommendation(
-                    user=user,
-                    movie=movie,
-                    score=round(score, 4),
-                    explanation=explanation,
-                    journal_snippet=snippet,
-                )
-            )
-        Recommendation.objects.bulk_create(recs)
+        )
 
-    return get_recommendations(user)
+    return recs
 
 
-def get_recommendations(user: "User") -> QuerySet[Recommendation]:
-    """Return existing recommendations without regenerating."""
+def get_recommendations(user: "User") -> list[Recommendation]:
+    """Return freshly generated recommendations."""
     if not has_enough_journal_entries(user):
-        return Recommendation.objects.none()
+        Recommendation.objects.filter(user=user).delete()
+        return []
 
-    return (
-        Recommendation.objects.filter(user=user, movie__embedding__isnull=False)
-        .select_related("movie")
-        .prefetch_related("movie__genres", "movie__streaming_platforms")
-        .order_by("-score")
-    )
+    return generate_recommendations(user)

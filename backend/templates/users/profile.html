@@ -46,59 +46,7 @@
     {% endif %}
   </section>
 
-  <div class="profile-body profile-body--settings">
-    <aside class="profile-sidebar">
-      <div class="sidebar-section sidebar-section--account">
-        <h2 class="sidebar-heading">
-          <span class="sidebar-heading-rule"></span>
-          Account file
-        </h2>
-        <dl class="profile-file-list">
-          <div>
-            <dt>Services</dt>
-            <dd>{{ selected_streaming_platform_ids|length }} selected</dd>
-          </div>
-          <div>
-            <dt>Status</dt>
-            <dd>{% if request.user.is_email_verified %}Verified{% else %}Unverified{% endif %}</dd>
-          </div>
-        </dl>
-      </div>
-
-      {% if taste_genres %}
-      <div class="sidebar-section">
-        <h2 class="sidebar-heading">
-          <span class="sidebar-heading-rule"></span>
-          Taste profile
-        </h2>
-        <ul class="taste-list">
-          {% for g in taste_genres %}
-          <li class="taste-item{% if g.is_negative %} taste-item--negative{% endif %}">
-            <span class="taste-bar-wrap">
-              <span class="taste-bar" style="width: {{ g.width }}%;"></span>
-            </span>
-            <span class="taste-genre">{{ g.name }}</span>
-            <span class="taste-count">{% if g.is_negative %}Negative{% else %}{{ g.count }}{% endif %}</span>
-          </li>
-          {% endfor %}
-        </ul>
-      </div>
-      {% endif %}
-
-      <div class="sidebar-section">
-        <h2 class="sidebar-heading">
-          <span class="sidebar-heading-rule"></span>
-          Quick links
-        </h2>
-        <div class="profile-link-list">
-          <a href="{% url 'journal:list' %}">Your journal</a>
-          <a href="{% url 'recommendations:list' %}">Recommendations</a>
-          <a href="{% url 'movies:wishlist' %}">Watchlist</a>
-        </div>
-      </div>
-    </aside>
-
-    <main class="profile-main">
+  <main class="profile-main">
       <section class="profile-section">
         <h2 class="section-heading">
           <span class="section-heading-rule"></span>
@@ -212,8 +160,7 @@
         </div>
       </section>
 
-    </main>
-  </div>
+  </main>
 </div>
 {% endblock %}
 

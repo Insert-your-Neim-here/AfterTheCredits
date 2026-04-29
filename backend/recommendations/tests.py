@@ -1,6 +1,7 @@
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
+from unittest.mock import patch
 
 from journal.models import JournalEntry
 from movies.models import Genre, Movie, MovieCredit, Person
@@ -41,24 +42,33 @@ class RecommendationThresholdTests(TestCase):
             is_positive=True,
         )
 
-    def test_existing_recommendations_hidden_until_three_entries(self):
+    def test_cached_recommendations_hidden_until_three_entries(self):
         for tmdb_id in range(2, MIN_JOURNAL_ENTRIES + 1):
             self._add_entry(tmdb_id)
 
-        self.assertFalse(get_recommendations(self.user).exists())
+        self.assertEqual(get_recommendations(self.user), [])
+        self.assertEqual(Recommendation.objects.count(), 0)
 
-    def test_existing_recommendations_show_after_three_entries(self):
+    def test_cached_recommendations_are_not_reused_after_three_entries(self):
         for tmdb_id in range(2, MIN_JOURNAL_ENTRIES + 2):
             self._add_entry(tmdb_id)
 
-        self.assertEqual(list(get_recommendations(self.user)), list(Recommendation.objects.all()))
+        self.assertEqual(get_recommendations(self.user), [])
+        self.assertEqual(Recommendation.objects.count(), 0)
 
     def test_recommendation_links_use_tmdb_id_not_database_id(self):
         for tmdb_id in range(2, MIN_JOURNAL_ENTRIES + 2):
             self._add_entry(tmdb_id)
 
         self.client.force_login(self.user)
-        response = self.client.get(reverse("recommendations:list"))
+        rec = Recommendation(
+            user=self.user,
+            movie=self.movie,
+            score=0.9,
+            explanation="Fresh pick",
+        )
+        with patch("recommendations.views.get_recommendations", return_value=[rec]):
+            response = self.client.get(reverse("recommendations:list"))
 
         self.assertContains(response, reverse("movies:details", args=[self.movie.tmdb_id]))
         self.assertContains(response, reverse("journal:create", args=[self.movie.tmdb_id]))
@@ -91,7 +101,28 @@ class RecommendationThresholdTests(TestCase):
             self._add_entry(tmdb_id)
 
         self.client.force_login(self.user)
-        response = self.client.get(reverse("recommendations:list"), {"runtime": "90"})
+        recs = [
+            Recommendation(
+                user=self.user,
+                movie=short_movie,
+                score=0.8,
+                explanation="Short enough",
+            ),
+            Recommendation(
+                user=self.user,
+                movie=long_movie,
+                score=0.7,
+                explanation="Too long",
+            ),
+            Recommendation(
+                user=self.user,
+                movie=self.movie,
+                score=0.6,
+                explanation="No runtime",
+            ),
+        ]
+        with patch("recommendations.views.get_recommendations", return_value=recs):
+            response = self.client.get(reverse("recommendations:list"), {"runtime": "90"})
 
         self.assertContains(response, "Short Pick")
         self.assertNotContains(response, "Long Pick")
@@ -102,7 +133,14 @@ class RecommendationThresholdTests(TestCase):
             self._add_entry(tmdb_id)
 
         self.client.force_login(self.user)
-        response = self.client.get(reverse("recommendations:list"))
+        rec = Recommendation(
+            user=self.user,
+            movie=self.movie,
+            score=0.9,
+            explanation="Fresh pick",
+        )
+        with patch("recommendations.views.get_recommendations", return_value=[rec]):
+            response = self.client.get(reverse("recommendations:list"))
 
         self.assertNotContains(response, "REFRESH")
         self.assertContains(response, "WATCH SESSION")

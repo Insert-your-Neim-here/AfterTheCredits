@@ -37,18 +37,18 @@ def recommendations_view(request):
     journal_count = get_journal_entry_count(request.user)
     can_generate = journal_count >= MIN_JOURNAL_ENTRIES
 
-    if can_generate and not recs.exists():
-        generate_recommendations(request.user)
-        recs = get_recommendations(request.user)
-
     runtime_minutes = _runtime_minutes(request)
-    unfiltered_has_recs = recs.exists()
+    unfiltered_has_recs = bool(recs)
     if runtime_minutes:
-        recs = recs.filter(movie__runtime__isnull=False, movie__runtime__lte=runtime_minutes)
+        recs = [
+            rec
+            for rec in recs
+            if rec.movie.runtime is not None and rec.movie.runtime <= runtime_minutes
+        ]
 
     context = {
         "recs": recs,
-        "has_recs": recs.exists(),
+        "has_recs": bool(recs),
         "unfiltered_has_recs": unfiltered_has_recs,
         "journal_count": journal_count,
         "min_journal_entries": MIN_JOURNAL_ENTRIES,

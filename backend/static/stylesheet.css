@@ -1902,131 +1902,6 @@ footer {
   text-transform: uppercase;
 }
 
-/* ── Profile body layout ─────────────────────────────────────────────────── */
-
-.profile-body {
-  display: grid;
-  grid-template-columns: minmax(230px, 280px) minmax(0, 1fr);
-  gap: 1.4rem;
-  align-items: start;
-}
-
-.profile-body--settings {
-  grid-template-columns: minmax(230px, 285px) minmax(0, 1fr);
-}
-
-/* ── Sidebar ─────────────────────────────────────────────────────────────── */
-
-.profile-sidebar {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-  position: sticky;
-  top: 2rem;
-  min-width: 0;
-}
-
-.sidebar-section {
-  border: 1px solid #242424;
-  padding: 1.2rem;
-  background: linear-gradient(180deg, #101010, #0b0b0b);
-  min-width: 0;
-}
-
-.sidebar-section--account {
-  background:
-    linear-gradient(180deg, rgba(240, 236, 224, 0.05), transparent),
-    #0d0d0d;
-}
-
-.sidebar-heading {
-  font-family: 'Courier Prime', monospace;
-  font-size: 0.62rem;
-  letter-spacing: 0.16em;
-  color: #7d7669;
-  text-transform: uppercase;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 0 0 1rem;
-  min-width: 0;
-}
-
-.sidebar-heading-rule {
-  display: block;
-  height: 1px;
-  width: 20px;
-  background: #746f63;
-  flex-shrink: 0;
-}
-
-.sidebar-hint {
-  font-family: 'Courier Prime', monospace;
-  font-size: 0.72rem;
-  color: #444;
-  margin: -0.5rem 0 1rem;
-  line-height: 1.5;
-}
-
-.profile-link-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.55rem;
-}
-
-.profile-link-list a {
-  font-family: 'Courier Prime', monospace;
-  font-size: 0.74rem;
-  color: #777;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  transition: color 0.15s;
-  overflow-wrap: anywhere;
-}
-
-.profile-link-list a:hover { color: #f0ece0; }
-
-.profile-file-list {
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.85rem;
-  min-width: 0;
-}
-
-.profile-file-list div {
-  border-bottom: 1px solid #1c1c1c;
-  padding-bottom: 0.85rem;
-  min-width: 0;
-}
-
-.profile-file-list div:last-child {
-  border-bottom: 0;
-  padding-bottom: 0;
-}
-
-.profile-file-list dt {
-  font-family: 'Courier Prime', monospace;
-  font-size: 0.58rem;
-  color: #555;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  margin-bottom: 0.2rem;
-  min-width: 0;
-}
-
-.profile-file-list dd {
-  font-family: 'Courier Prime', monospace;
-  font-size: 0.8rem;
-  color: #d6d0c2;
-  line-height: 1.35;
-  margin: 0;
-  min-width: 0;
-  max-width: 100%;
-  overflow-wrap: anywhere;
-  word-break: break-word;
-}
-
 .profile-settings-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(280px, 1fr));
@@ -2221,65 +2096,6 @@ footer {
   text-transform: uppercase;
 }
 .btn-save-platforms:hover { background: transparent; color: #f0ece0; }
-
-/* Taste profile bars */
-.taste-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.taste-item {
-  display: grid;
-  grid-template-columns: minmax(44px, 72px) minmax(0, 1fr) max-content;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
-
-.taste-bar-wrap {
-  height: 2px;
-  background: #1a1a1a;
-  position: relative;
-  overflow: hidden;
-}
-
-.taste-bar {
-  display: block;
-  height: 100%;
-  background: #f0ece0;
-  transition: width 0.6s ease;
-}
-
-.taste-item--negative .taste-bar {
-  background: #c95050;
-}
-
-.taste-genre {
-  font-family: 'Courier Prime', monospace;
-  font-size: 0.68rem;
-  color: #777;
-  letter-spacing: 0.04em;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.taste-count {
-  font-family: 'Courier Prime', monospace;
-  font-size: 0.62rem;
-  color: #444;
-  text-align: right;
-  white-space: nowrap;
-}
-
-.taste-item--negative .taste-genre,
-.taste-item--negative .taste-count {
-  color: #c95050;
-}
 
 /* ── Main content ────────────────────────────────────────────────────────── */
 
@@ -2513,18 +2329,6 @@ footer {
 }
 
 @media (max-width: 1040px) {
-  .profile-body,
-  .profile-body--settings {
-    grid-template-columns: 1fr;
-  }
-
-  .profile-sidebar {
-    position: static;
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    align-items: stretch;
-  }
-
   .profile-settings-grid {
     grid-template-columns: repeat(2, minmax(260px, 1fr));
   }
@@ -2558,7 +2362,6 @@ footer {
     grid-column: 1 / -1;
   }
 
-  .profile-sidebar,
   .profile-settings-grid {
     grid-template-columns: 1fr;
   }
@@ -2590,7 +2393,6 @@ footer {
     grid-column: 1 / -1;
   }
 
-  .sidebar-section,
   .settings-panel {
     padding: 1rem;
   }
@@ -2605,13 +2407,4 @@ footer {
     height: 1.8rem;
   }
 
-  .taste-item {
-    grid-template-columns: 52px minmax(0, 1fr);
-  }
-
-  .taste-count {
-    grid-column: 2;
-    justify-self: start;
-    font-size: 0.58rem;
-  }
 }

@@ -79,7 +79,7 @@ class ProfileTasteTests(TestCase):
             password="password",
         )
 
-    def test_negative_genre_is_not_top_genre_but_appears_in_taste_profile(self):
+    def test_negative_genre_is_not_top_genre(self):
         comedy = Genre.objects.create(tmdb_id=35, name="Comedy")
         drama = Genre.objects.create(tmdb_id=18, name="Drama")
         comedy_movie = Movie.objects.create(tmdb_id=101, title="Bad Comedy")
@@ -114,12 +114,35 @@ class ProfileTasteTests(TestCase):
         top_genre_names = {
             row["movie__genres__name"] for row in response.context["top_genres"]
         }
-        negative_taste_genres = {
-            row["name"]
-            for row in response.context["taste_genres"]
-            if row["is_negative"]
-        }
 
         self.assertNotIn("Comedy", top_genre_names)
         self.assertIn("Drama", top_genre_names)
-        self.assertIn("Comedy", negative_taste_genres)
+
+    def test_top_genres_are_limited_to_five(self):
+        genres = [
+            Genre.objects.create(tmdb_id=1000 + i, name=f"Genre {i}")
+            for i in range(6)
+        ]
+
+        for i, genre in enumerate(genres):
+            movie = Movie.objects.create(tmdb_id=2000 + i, title=f"Movie {i}")
+            movie.genres.add(genre)
+            JournalEntry.objects.create(
+                user=self.user,
+                movie=movie,
+                raw_text=f"Entry {i}",
+                is_positive=True,
+                liked_genre=True,
+                liked_story=True,
+                liked_performances=True,
+                would_rewatch=True,
+            )
+
+        self.client.force_login(self.user)
+        response = self.client.get(reverse("users:profile"))
+
+        top_genre_names = [
+            row["movie__genres__name"] for row in response.context["top_genres"]
+        ]
+
+        self.assertEqual(len(top_genre_names), 5)

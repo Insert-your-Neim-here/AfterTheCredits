@@ -16,7 +16,7 @@ from django.db.models import Count
 from django.views.decorators.http import require_http_methods
 
 from journal.services import get_user_journal_entries
-from movies.models import Genre, StreamingPlatform
+from movies.models import StreamingPlatform
 from recommendations.services import get_negative_genre_signal_ids
 
 from .forms import LoginForm, ProfileForm, SignupForm, VerificationCodeForm
@@ -158,12 +158,6 @@ def profile_view(request):
             selected_streaming_platform_ids = request.POST.getlist("streaming_platforms")
             if form.is_valid():
                 form.save()
-                # Regenerate recommendations now that platforms may have changed
-                try:
-                    from recommendations.services import generate_recommendations
-                    generate_recommendations(request.user)
-                except Exception:
-                    pass
                 messages.success(request, "Streaming services updated.")
                 return redirect("users:profile")
     else:
@@ -178,8 +172,9 @@ def profile_view(request):
     positive_count = journal_entries.filter(is_positive=True).count()
     rewatch_count  = journal_entries.filter(would_rewatch=True).count()
 
-    taste_entries = list(journal_entries.prefetch_related("movie__genres"))
-    negative_genre_ids = get_negative_genre_signal_ids(taste_entries)
+    negative_genre_ids = get_negative_genre_signal_ids(
+        list(journal_entries.prefetch_related("movie__genres"))
+    )
 
     # Favourite genres across journalled films, excluding genres with any
     # negative taste signal so they don't appear as favourites.
@@ -189,29 +184,7 @@ def profile_view(request):
         .annotate(c=Count("movie__genres__id"))
         .exclude(movie__genres__id=None)
         .exclude(movie__genres__id__in=negative_genre_ids)
-        .order_by("-c")[:5]
-    )
-
-    negative_genres = Genre.objects.filter(id__in=negative_genre_ids).order_by("name")
-
-    max_count = max([row["c"] for row in top_genres] + [1])
-    taste_genres = [
-        {
-            "name": row["movie__genres__name"],
-            "count": row["c"],
-            "width": round((row["c"] / max_count) * 100),
-            "is_negative": False,
-        }
-        for row in top_genres
-    ]
-    taste_genres.extend(
-        {
-            "name": genre.name,
-            "count": 0,
-            "width": 100,
-            "is_negative": True,
-        }
-        for genre in negative_genres
+        .order_by("-c", "movie__genres__name")[:5]
     )
 
     context = {
@@ -223,6 +196,5 @@ def profile_view(request):
         "positive_count": positive_count,
         "rewatch_count":  rewatch_count,
         "top_genres":     top_genres,
-        "taste_genres":   taste_genres,
     }
     return render(request, "users/profile.html", context)
