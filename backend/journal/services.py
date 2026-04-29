@@ -1,4 +1,5 @@
 from core.services.embedding_service import compute_embedding, get_embedding_model
+from users.services.profile_embedding import update_user_profile_embedding
 from .models import JournalEntry
 
 # ── Survey step definitions ────────────────────────────────────────────────────
@@ -42,6 +43,7 @@ def save_entry_with_embedding(entry: JournalEntry) -> JournalEntry:
     embedding = compute_embedding(entry.raw_text)
     entry.embedding = embedding
     entry.save()
+    update_user_profile_embedding(entry.user)
     return entry
 
 

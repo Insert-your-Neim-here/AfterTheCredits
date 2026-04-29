@@ -7,6 +7,7 @@ from django.contrib import messages
 from django.views.decorators.http import require_POST
 
 from movies.models import Movie
+from users.services.profile_embedding import update_user_profile_embedding
 from .forms import JournalTextForm, JournalEditForm
 from .models import JournalEntry
 from .services import (
@@ -141,6 +142,7 @@ def delete_entry_view(request, entry_id):
 
     if request.method == "POST":
         entry.delete()
+        update_user_profile_embedding(request.user)
         messages.success(request, f'Journal entry for "{movie.title if movie else "Unknown Movie"}" deleted.')
         return redirect("journal:list")
 

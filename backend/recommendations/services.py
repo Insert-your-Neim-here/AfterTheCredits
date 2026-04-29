@@ -6,11 +6,12 @@ Strategy
 1. Build a profile embedding from the user's journal-entry embeddings, weighting
    each entry by its survey score so highly rated films pull harder.
 2. Find candidate movies via cosine similarity against that profile vector.
-3. Apply a multi-signal re-ranking pass:
+3. Apply a multi-signal re-ranking pass using the journal survey:
+   - overall positivity (is_positive) boosts matching directors/producers
    - genre affinity (liked_genre) boosts movies sharing genres
-   - story/writing (liked_story) mildly boosts genre-similar movies
-   - performances (liked_performances) mildly boosts genre-similar movies
-   - rewatchability (would_rewatch) applies a stronger multiplier
+   - story/writing (liked_story) boosts matching writers/directors
+   - performances (liked_performances) boosts matching top-billed actors
+   - rewatchability (would_rewatch) strengthens matches to that whole movie
    - negative signal (is_positive=False) penalizes genre-similar movies
 4. Filter by user streaming platforms, if the user has set any.
 5. Exclude films the user has already journaled.
@@ -20,7 +21,6 @@ Strategy
 from __future__ import annotations
 
 import logging
-import math
 from typing import TYPE_CHECKING
 
 from django.db import transaction
@@ -28,7 +28,8 @@ from django.db.models import QuerySet
 from pgvector.django import CosineDistance
 
 from journal.models import JournalEntry
-from movies.models import Movie
+from movies.models import Movie, MovieCredit
+from users.services.profile_embedding import update_user_profile_embedding
 
 from .models import Recommendation
 
@@ -39,13 +40,17 @@ logger = logging.getLogger(__name__)
 
 # Tuneable knobs
 CANDIDATE_POOL = 60  # how many movies to pull from pgvector before re-rank
-TOP_N = 12  # final recommendations returned
+MIN_JOURNAL_ENTRIES = 3
+TOP_N = 3  # final recommendations returned
 GENRE_BOOST = 0.12  # added to score when liked_genre=True and genres overlap
-STORY_BOOST = 0.05
-PERFORMANCE_BOOST = 0.05
-REWATCH_MULTIPLIER = 1.20  # score multiplied when would_rewatch=True
+OVERALL_CREW_BOOST = 0.10
+STORY_CREW_BOOST = 0.10
+PERFORMANCE_BOOST = 0.10
+REWATCH_MULTIPLIER = 1.20  # strengthens matches to rewatchable movies
 NEGATIVE_PENALTY = 0.60  # score multiplied for negative genre clusters
 MIN_SCORE = 0.10  # discard anything below this threshold
+MAIN_ACTOR_LIMIT = 5
+EXPLANATION_NAME_LIMIT = 2
 
 
 def _movie_genre_ids(movie: Movie | None) -> set[int]:
@@ -54,39 +59,52 @@ def _movie_genre_ids(movie: Movie | None) -> set[int]:
     return {genre.id for genre in movie.genres.all()}
 
 
-def _build_profile_vector(entries: list[JournalEntry]) -> list[float] | None:
-    """
-    Build a weighted average of journal-entry embeddings.
+def _credit_person_ids(
+    movie: Movie | None,
+    roles: set[str],
+    *,
+    actor_limit: int | None = None,
+) -> set[int]:
+    if movie is None:
+        return set()
 
-    This avoids creating one large profile string that the embedding model may
-    truncate once the user has enough journal history.
-    """
-    weighted_sum: list[float] | None = None
-    total_weight = 0
-
-    for entry in entries:
-        if entry.embedding is None:
+    person_ids: set[int] = set()
+    actors_seen = 0
+    for credit in movie.credits.all():
+        if credit.role not in roles:
             continue
+        if credit.role == MovieCredit.ROLE_ACTOR and actor_limit is not None:
+            if actors_seen >= actor_limit:
+                continue
+            actors_seen += 1
+        person_ids.add(credit.person_id)
+    return person_ids
 
-        vector = list(entry.embedding)
-        weight = max(1, entry.survey_score or 0)
 
-        if weighted_sum is None:
-            weighted_sum = [0.0] * len(vector)
+def _matching_credit_names(
+    movie: Movie,
+    role: str,
+    person_ids: set[int],
+    *,
+    actor_limit: int | None = None,
+) -> list[str]:
+    names: list[str] = []
+    seen: set[int] = set()
+    actors_seen = 0
 
-        for index, value in enumerate(vector):
-            weighted_sum[index] += float(value) * weight
-        total_weight += weight
+    for credit in movie.credits.all():
+        if credit.role != role:
+            continue
+        if role == MovieCredit.ROLE_ACTOR and actor_limit is not None:
+            if actors_seen >= actor_limit:
+                continue
+            actors_seen += 1
+        if credit.person_id not in person_ids or credit.person_id in seen:
+            continue
+        names.append(credit.person.name)
+        seen.add(credit.person_id)
 
-    if weighted_sum is None or total_weight == 0:
-        return None
-
-    averaged = [value / total_weight for value in weighted_sum]
-    magnitude = math.sqrt(sum(value * value for value in averaged))
-    if magnitude == 0:
-        return None
-
-    return [value / magnitude for value in averaged]
+    return names
 
 
 def _get_platform_ids(user: "User") -> list[int]:
@@ -111,6 +129,18 @@ def _negative_genre_ids(entries: list[JournalEntry]) -> set[int]:
     return ids
 
 
+def _person_ids_from_entries(
+    entries: list[JournalEntry],
+    roles: set[str],
+    *,
+    actor_limit: int | None = None,
+) -> set[int]:
+    ids: set[int] = set()
+    for entry in entries:
+        ids.update(_credit_person_ids(entry.movie, roles, actor_limit=actor_limit))
+    return ids
+
+
 def _journalled_movie_ids(entries: list[JournalEntry]) -> set[int]:
     return {entry.movie_id for entry in entries if entry.movie_id is not None}
 
@@ -122,10 +152,23 @@ def _genre_ids_from_entries(entries) -> set[int]:
     return ids
 
 
+def get_journal_entry_count(user: "User") -> int:
+    return JournalEntry.objects.filter(user=user, movie__isnull=False).count()
+
+
+def has_enough_journal_entries(user: "User") -> bool:
+    return get_journal_entry_count(user) >= MIN_JOURNAL_ENTRIES
+
+
 def _build_explanation(
     movie: Movie,
     liked_genres: set[int],
     entry_map: dict[int, JournalEntry],
+    *,
+    director_ids: set[int] | None = None,
+    producer_ids: set[int] | None = None,
+    writer_ids: set[int] | None = None,
+    actor_ids: set[int] | None = None,
 ) -> tuple[str, str]:
     """
     Return (explanation, journal_snippet) for a recommended movie.
@@ -138,6 +181,31 @@ def _build_explanation(
         explanation = f"Matches your taste for {', '.join(matching_genres[:2])}."
     else:
         explanation = "Similar feel to films you've enjoyed."
+
+    people_matches = []
+    role_matches = [
+        ("director", MovieCredit.ROLE_DIRECTOR, director_ids or set(), None),
+        ("producer", MovieCredit.ROLE_PRODUCER, producer_ids or set(), None),
+        ("writer", MovieCredit.ROLE_WRITER, writer_ids or set(), None),
+        (
+            "actor",
+            MovieCredit.ROLE_ACTOR,
+            actor_ids or set(),
+            MAIN_ACTOR_LIMIT,
+        ),
+    ]
+    for label, role, ids, actor_limit in role_matches:
+        names = _matching_credit_names(
+            movie,
+            role,
+            ids,
+            actor_limit=actor_limit,
+        )[:EXPLANATION_NAME_LIMIT]
+        if names:
+            people_matches.append(f"{label} {', '.join(names)}")
+
+    if people_matches:
+        explanation = f"{explanation} Also connects through {'; '.join(people_matches[:3])}."
 
     # Find a journal entry whose genres overlap most with this movie.
     snippet = ""
@@ -159,14 +227,15 @@ def generate_recommendations(user: "User") -> QuerySet[Recommendation]:
     entries = list(
         JournalEntry.objects.filter(user=user, movie__isnull=False)
         .select_related("movie")
-        .prefetch_related("movie__genres")
+        .prefetch_related("movie__genres", "movie__credits__person")
     )
 
-    if not entries:
+    if len(entries) < MIN_JOURNAL_ENTRIES:
+        Recommendation.objects.filter(user=user).delete()
         return Recommendation.objects.none()
 
-    # 1. Build profile embedding.
-    profile_vector = _build_profile_vector(entries)
+    # 1. Read the persisted profile embedding, refreshing it if needed.
+    profile_vector = user.profile_embedding or update_user_profile_embedding(user)
     if not profile_vector:
         return Recommendation.objects.none()
 
@@ -182,7 +251,7 @@ def generate_recommendations(user: "User") -> QuerySet[Recommendation]:
     candidates = list(
         qs.annotate(vector_distance=CosineDistance("embedding", profile_vector))
         .order_by("vector_distance")
-        .prefetch_related("genres", "streaming_platforms")[:CANDIDATE_POOL]
+        .prefetch_related("genres", "streaming_platforms", "credits__person")[:CANDIDATE_POOL]
     )
 
     if not candidates and platform_ids:
@@ -196,7 +265,7 @@ def generate_recommendations(user: "User") -> QuerySet[Recommendation]:
             .filter(embedding__isnull=False)
             .annotate(vector_distance=CosineDistance("embedding", profile_vector))
             .order_by("vector_distance")
-            .prefetch_related("genres", "streaming_platforms")[:CANDIDATE_POOL]
+            .prefetch_related("genres", "streaming_platforms", "credits__person")[:CANDIDATE_POOL]
         )
 
     # 3. Re-rank with survey signals.
@@ -205,14 +274,72 @@ def generate_recommendations(user: "User") -> QuerySet[Recommendation]:
     entry_map = {entry.movie_id: entry for entry in entries if entry.movie_id is not None}
 
     rewatch_yes_entries = {entry for entry in entries if entry.would_rewatch is True}
+    positive_entries = {entry for entry in entries if entry.is_positive is True}
     story_liked_entries = {entry for entry in entries if entry.liked_story is True}
     perf_liked_entries = {
         entry for entry in entries if entry.liked_performances is True
     }
 
     rewatch_genre_ids = _genre_ids_from_entries(rewatch_yes_entries)
-    story_genre_ids = _genre_ids_from_entries(story_liked_entries)
-    perf_genre_ids = _genre_ids_from_entries(perf_liked_entries)
+    rewatch_crew_ids = _person_ids_from_entries(
+        rewatch_yes_entries,
+        {
+            MovieCredit.ROLE_DIRECTOR,
+            MovieCredit.ROLE_PRODUCER,
+            MovieCredit.ROLE_WRITER,
+        },
+    )
+    rewatch_actor_ids = _person_ids_from_entries(
+        rewatch_yes_entries,
+        {MovieCredit.ROLE_ACTOR},
+        actor_limit=MAIN_ACTOR_LIMIT,
+    )
+    positive_crew_ids = _person_ids_from_entries(
+        positive_entries,
+        {MovieCredit.ROLE_DIRECTOR, MovieCredit.ROLE_PRODUCER},
+    )
+    positive_director_ids = _person_ids_from_entries(
+        positive_entries,
+        {MovieCredit.ROLE_DIRECTOR},
+    )
+    positive_producer_ids = _person_ids_from_entries(
+        positive_entries,
+        {MovieCredit.ROLE_PRODUCER},
+    )
+    story_crew_ids = _person_ids_from_entries(
+        story_liked_entries,
+        {MovieCredit.ROLE_WRITER, MovieCredit.ROLE_DIRECTOR},
+    )
+    story_director_ids = _person_ids_from_entries(
+        story_liked_entries,
+        {MovieCredit.ROLE_DIRECTOR},
+    )
+    story_writer_ids = _person_ids_from_entries(
+        story_liked_entries,
+        {MovieCredit.ROLE_WRITER},
+    )
+    performance_actor_ids = _person_ids_from_entries(
+        perf_liked_entries,
+        {MovieCredit.ROLE_ACTOR},
+        actor_limit=MAIN_ACTOR_LIMIT,
+    )
+    rewatch_director_ids = _person_ids_from_entries(
+        rewatch_yes_entries,
+        {MovieCredit.ROLE_DIRECTOR},
+    )
+    rewatch_producer_ids = _person_ids_from_entries(
+        rewatch_yes_entries,
+        {MovieCredit.ROLE_PRODUCER},
+    )
+    rewatch_writer_ids = _person_ids_from_entries(
+        rewatch_yes_entries,
+        {MovieCredit.ROLE_WRITER},
+    )
+
+    explanation_director_ids = positive_director_ids | story_director_ids | rewatch_director_ids
+    explanation_producer_ids = positive_producer_ids | rewatch_producer_ids
+    explanation_writer_ids = story_writer_ids | rewatch_writer_ids
+    explanation_actor_ids = performance_actor_ids | rewatch_actor_ids
 
     scored: list[tuple[float, Movie]] = []
 
@@ -222,17 +349,37 @@ def generate_recommendations(user: "User") -> QuerySet[Recommendation]:
         score = max(0.0, 1.0 - raw_distance)
 
         movie_genre_ids = _movie_genre_ids(movie)
+        movie_story_crew_ids = _credit_person_ids(
+            movie,
+            {MovieCredit.ROLE_WRITER, MovieCredit.ROLE_DIRECTOR},
+        )
+        movie_overall_crew_ids = _credit_person_ids(
+            movie,
+            {MovieCredit.ROLE_DIRECTOR, MovieCredit.ROLE_PRODUCER},
+        )
+        movie_actor_ids = _credit_person_ids(
+            movie,
+            {MovieCredit.ROLE_ACTOR},
+            actor_limit=MAIN_ACTOR_LIMIT,
+        )
 
         if movie_genre_ids & liked_genres:
             score += GENRE_BOOST
 
-        if movie_genre_ids & story_genre_ids:
-            score += STORY_BOOST
+        if movie_overall_crew_ids & positive_crew_ids:
+            score += OVERALL_CREW_BOOST
 
-        if movie_genre_ids & perf_genre_ids:
+        if movie_story_crew_ids & story_crew_ids:
+            score += STORY_CREW_BOOST
+
+        if movie_actor_ids & performance_actor_ids:
             score += PERFORMANCE_BOOST
 
-        if movie_genre_ids & rewatch_genre_ids:
+        if (
+            movie_genre_ids & rewatch_genre_ids
+            or movie_story_crew_ids & rewatch_crew_ids
+            or movie_actor_ids & rewatch_actor_ids
+        ):
             score *= REWATCH_MULTIPLIER
 
         if movie_genre_ids & negative_genres:
@@ -249,7 +396,15 @@ def generate_recommendations(user: "User") -> QuerySet[Recommendation]:
         Recommendation.objects.filter(user=user).delete()
         recs = []
         for score, movie in top:
-            explanation, snippet = _build_explanation(movie, liked_genres, entry_map)
+            explanation, snippet = _build_explanation(
+                movie,
+                liked_genres,
+                entry_map,
+                director_ids=explanation_director_ids,
+                producer_ids=explanation_producer_ids,
+                writer_ids=explanation_writer_ids,
+                actor_ids=explanation_actor_ids,
+            )
             recs.append(
                 Recommendation(
                     user=user,
@@ -266,6 +421,9 @@ def generate_recommendations(user: "User") -> QuerySet[Recommendation]:
 
 def get_recommendations(user: "User") -> QuerySet[Recommendation]:
     """Return existing recommendations without regenerating."""
+    if not has_enough_journal_entries(user):
+        return Recommendation.objects.none()
+
     return (
         Recommendation.objects.filter(user=user, movie__embedding__isnull=False)
         .select_related("movie")

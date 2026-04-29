@@ -84,3 +84,40 @@ class Wishlist(models.Model):
 
     def __str__(self):
         return f"{self.user.email} → {self.movie.title}"
+
+class Person(models.Model):
+    tmdb_id   = models.IntegerField(unique=True)
+    name      = models.CharField(max_length=255)
+    profile_path = models.CharField(max_length=255, blank=True, default="")
+
+    class Meta:
+        verbose_name_plural = "people"
+
+    def __str__(self):
+        return self.name
+
+
+class MovieCredit(models.Model):
+    ROLE_DIRECTOR = "director"
+    ROLE_WRITER   = "writer"
+    ROLE_ACTOR    = "actor"
+    ROLE_PRODUCER = "producer" 
+
+    ROLE_CHOICES = [
+        (ROLE_DIRECTOR, "Director"),
+        (ROLE_WRITER,   "Writer"),
+        (ROLE_ACTOR,    "Actor"),
+        (ROLE_PRODUCER, "Producer"),
+    ]
+
+    movie  = models.ForeignKey(Movie, on_delete=models.CASCADE, related_name="credits")
+    person = models.ForeignKey(Person, on_delete=models.CASCADE, related_name="credits")
+    role   = models.CharField(max_length=20, choices=ROLE_CHOICES)
+    order  = models.PositiveSmallIntegerField(default=0)  # cast order for actors
+
+    class Meta:
+        unique_together = ("movie", "person", "role")
+        ordering = ["role", "order"]
+
+    def __str__(self):
+        return f"{self.person.name} — {self.role} in {self.movie.title}"

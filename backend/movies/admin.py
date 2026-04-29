@@ -1,5 +1,13 @@
 from django.contrib import admin
-from .models import Movie, Genre, Keyword, StreamingPlatform, Wishlist
+from .models import (
+    Genre,
+    Keyword,
+    Movie,
+    MovieCredit,
+    Person,
+    StreamingPlatform,
+    Wishlist,
+)
 
 
 @admin.register(Movie)
@@ -23,6 +31,19 @@ class KeywordAdmin(admin.ModelAdmin):
 @admin.register(StreamingPlatform)
 class StreamingPlatformAdmin(admin.ModelAdmin):
     list_display = ['name']
+
+
+@admin.register(Person)
+class PersonAdmin(admin.ModelAdmin):
+    list_display = ['name', 'tmdb_id']
+    search_fields = ['name']
+
+
+@admin.register(MovieCredit)
+class MovieCreditAdmin(admin.ModelAdmin):
+    list_display = ['movie', 'person', 'role', 'order']
+    list_filter = ['role', 'movie']
+    search_fields = ['movie__title', 'person__name']
 
 @admin.register(Wishlist)
 class WishlistAdmin(admin.ModelAdmin):

@@ -6,7 +6,7 @@ import requests
 import logging
 from django.conf import settings
 from django.core.cache import cache
-from movies.models import Movie, Genre, Keyword, StreamingPlatform
+from movies.models import Genre, Keyword, Movie, MovieCredit, Person, StreamingPlatform
 from core.services.embedding_service import build_movie_text, compute_embedding
 
 logger = logging.getLogger(__name__)
@@ -17,6 +17,7 @@ STREAMING_REGION = getattr(settings, "TMDB_REGION", "GB")
 TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p/w500"
 TMDB_CACHE_TIMEOUT = 60 * 60 * 12
 PROVIDER_LOOKUP_WORKERS = 8
+MAX_ACTOR_CREDITS = 12
 
 if not TMDB_TOKEN:
     raise RuntimeError("TMDB_TOKEN is not set. Check your .env file.")
@@ -237,6 +238,57 @@ def fetch_movie_keywords(tmdb_id: int) -> list[dict]:
         return []
 
 
+def fetch_movie_credits(tmdb_id: int) -> dict:
+    """Return TMDb cast and crew credits for a movie."""
+    try:
+        return _tmdb_get(
+            f"/movie/{tmdb_id}/credits",
+            params={"language": "en-GB"},
+        )
+    except Exception:
+        return {"cast": [], "crew": []}
+
+
+def store_movie_credits(movie: Movie, credits_data: dict | None = None) -> int:
+    """Persist cast and key crew credits for a stored movie."""
+    credits_data = credits_data or fetch_movie_credits(movie.tmdb_id)
+    saved_count = 0
+
+    for cast_member in credits_data.get("cast", [])[:MAX_ACTOR_CREDITS]:
+        if _store_credit(
+            movie=movie,
+            person_data=cast_member,
+            role=MovieCredit.ROLE_ACTOR,
+            order=cast_member.get("order") or 0,
+        ):
+            saved_count += 1
+
+    crew_roles = {
+        "Director": MovieCredit.ROLE_DIRECTOR,
+        "Writer": MovieCredit.ROLE_WRITER,
+        "Screenplay": MovieCredit.ROLE_WRITER,
+        "Story": MovieCredit.ROLE_WRITER,
+        "Producer": MovieCredit.ROLE_PRODUCER,
+    }
+    seen_crew_credits = set()
+
+    for crew_member in credits_data.get("crew", []):
+        role = crew_roles.get(crew_member.get("job"))
+        if not role:
+            continue
+
+        person_id = crew_member.get("id")
+        credit_key = (person_id, role)
+        if credit_key in seen_crew_credits:
+            continue
+        seen_crew_credits.add(credit_key)
+
+        if _store_credit(movie=movie, person_data=crew_member, role=role):
+            saved_count += 1
+
+    return saved_count
+
+
 def attach_streaming_platforms(
     movies: list[dict],
     region: str | None = None,
@@ -448,8 +500,38 @@ def _process_movie(
     platforms = StreamingPlatform.objects.filter(name__in=platform_names)
     movie.streaming_platforms.set(platforms)
 
+    store_movie_credits(movie)
+
     movie.save()
     return True
+
+
+def _store_credit(
+    movie: Movie,
+    person_data: dict,
+    role: str,
+    order: int = 0,
+) -> bool:
+    person_id = person_data.get("id")
+    person_name = person_data.get("name")
+    if not person_id or not person_name:
+        return False
+
+    person, _ = Person.objects.update_or_create(
+        tmdb_id=person_id,
+        defaults={
+            "name": person_name,
+            "profile_path": person_data.get("profile_path") or "",
+        },
+    )
+
+    _, created = MovieCredit.objects.update_or_create(
+        movie=movie,
+        person=person,
+        role=role,
+        defaults={"order": order},
+    )
+    return created
 
 
 def poster_url(poster_path: str | None):
