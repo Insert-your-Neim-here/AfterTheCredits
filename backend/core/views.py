@@ -3,7 +3,6 @@ from datetime import date
 from django.shortcuts import render
 
 from movies.services.tmdb_client import (
-    attach_streaming_platforms,
     discover_movies,
     get_genres,
     popular_movies,
@@ -45,7 +44,7 @@ def home_view(request):
     used_search = q and not has_discovery_filters
 
     if used_search:
-        movies = search_movies(q, page=page, uk_only=True)
+        movies = search_movies(q, page=page)
     elif q or has_discovery_filters:
         movies = discover_movies(
             page=page,
@@ -55,13 +54,9 @@ def home_view(request):
             text_query=q,
             keyword_ids=keyword_ids,
             sort_by=sort_by,
-            uk_only=True,
         )
     else:
-        movies = popular_movies(page=page, uk_only=True)
-
-    if not used_search:
-        movies = attach_streaming_platforms(movies)
+        movies = popular_movies(page=page)
 
     for movie in movies:
         movie["poster_url"] = poster_url(movie.get("poster_path"))

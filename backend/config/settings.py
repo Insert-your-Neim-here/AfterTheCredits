@@ -157,6 +157,9 @@ CACHES = {
     }
 }
 
+# TMDb
+TMDB_REGION = os.environ.get("TMDB_REGION", "GB")
+
 # Login / logout redirects
 LOGIN_URL = 'users:login'
 LOGIN_REDIRECT_URL = 'core:home'

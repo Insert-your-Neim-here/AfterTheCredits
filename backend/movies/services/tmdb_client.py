@@ -4,6 +4,7 @@ from urllib.parse import urlencode
 
 import requests
 import logging
+from django.conf import settings
 from django.core.cache import cache
 from movies.models import Movie, Genre, Keyword, StreamingPlatform
 from core.services.embedding_service import build_movie_text, compute_embedding
@@ -12,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 TMDB_BASE = "https://api.themoviedb.org/3"
 TMDB_TOKEN = os.environ.get("TMDB_TOKEN")
-REGION = "GB"
+STREAMING_REGION = getattr(settings, "TMDB_REGION", "GB")
 TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p/w500"
 TMDB_CACHE_TIMEOUT = 60 * 60 * 12
 PROVIDER_LOOKUP_WORKERS = 8
@@ -47,7 +48,23 @@ def _tmdb_get(path: str, params: dict = None) -> dict:  # type: ignore
     return data
 
 
-def search_movies(query: str, page: int = 1, uk_only: bool = False):
+def _streaming_region(region: str | None = None) -> str:
+    return (region or STREAMING_REGION).upper()
+
+
+def _streaming_params(region: str | None = None) -> dict:
+    return {
+        "watch_region": _streaming_region(region),
+        "with_watch_monetization_types": "flatrate",
+    }
+
+
+def search_movies(
+    query: str,
+    page: int = 1,
+    uk_only: bool | None = None,
+    region: str | None = None,
+):
     data = _tmdb_get(
         "/search/movie",
         params={
@@ -57,33 +74,25 @@ def search_movies(query: str, page: int = 1, uk_only: bool = False):
             "page": page,
         },
     )
-    movies = data.get("results", [])
-    if uk_only:
-        return attach_streaming_platforms(movies)
-    return movies
+    return attach_streaming_platforms(data.get("results", []), region=region)
 
-def popular_movies(page: int = 1, uk_only: bool = False):
-    if uk_only:
-        data = _tmdb_get(
-            "/discover/movie",
-            params={
-                "language": "en-GB",
-                "page": page,
-                "sort_by": "popularity.desc",
-                "watch_region": REGION,
-                "with_watch_monetization_types": "flatrate",
-                "include_adult": "false",
-            },
-        )
-    else:
-        data = _tmdb_get(
-            "/movie/popular",
-            params={
-                "language": "en-GB",
-                "page": page,
-            },
-        )
-    return data.get("results", [])
+
+def popular_movies(
+    page: int = 1,
+    uk_only: bool | None = None,
+    region: str | None = None,
+):
+    data = _tmdb_get(
+        "/discover/movie",
+        params={
+            "language": "en-GB",
+            "page": page,
+            "sort_by": "popularity.desc",
+            "include_adult": "false",
+            **_streaming_params(region),
+        },
+    )
+    return attach_streaming_platforms(data.get("results", []), region=region)
 
 
 def get_genres():
@@ -122,13 +131,15 @@ def discover_movies(
     text_query: str = "",
     keyword_ids: list[int] | None = None,
     sort_by: str = "popularity.desc",
-    uk_only: bool = True,
+    uk_only: bool | None = None,
+    region: str | None = None,
 ):
     params = {
         "language": "en-GB",
         "page": page,
         "sort_by": sort_by,
         "include_adult": "false",
+        **_streaming_params(region),
     }
 
     if genre:
@@ -151,12 +162,8 @@ def discover_movies(
     if year:
         params["primary_release_year"] = year
 
-    if uk_only:
-        params["watch_region"] = REGION
-        params["with_watch_monetization_types"] = "flatrate"
-
     data = _tmdb_get("/discover/movie", params=params)
-    return data.get("results", [])
+    return attach_streaming_platforms(data.get("results", []), region=region)
 
 def fetch_and_store_genres():
     """Fetch all movie genres from TMDb and store them."""
@@ -168,19 +175,23 @@ def fetch_and_store_genres():
         )
     logger.info(f"Synced {len(data.get('genres', []))} genres.")
 
-def fetch_streaming_platforms():
+def fetch_streaming_platforms(region: str | None = None):
     """
-    Fetch watch providers available in the UK.
+    Fetch watch providers available in the configured streaming region.
     Stores them as StreamingPlatform objects.
     """
-    data = _tmdb_get("/watch/providers/movie", params={"watch_region": REGION})
+    streaming_region = _streaming_region(region)
+    data = _tmdb_get(
+        "/watch/providers/movie",
+        params={"watch_region": streaming_region},
+    )
     count = 0
     for provider in data.get("results", []):
         StreamingPlatform.objects.update_or_create(
             name=provider["provider_name"],
         )
         count += 1
-    logger.info(f"Synced {count} streaming platforms.")
+    logger.info(f"Synced {count} streaming platforms for {streaming_region}.")
 
 def _normalize_provider_name(name: str) -> str:
     """Collapse TMDb subscription tiers into the main streaming service name."""
@@ -198,12 +209,13 @@ def _normalize_provider_name(name: str) -> str:
     return name
 
 
-def fetch_movie_watch_providers(tmdb_id: int) -> list[str]:
-    """Return list of UK streaming platform names for a movie."""
+def fetch_movie_watch_providers(tmdb_id: int, region: str | None = None) -> list[str]:
+    """Return streaming platform names for a movie in the configured region."""
     try:
+        streaming_region = _streaming_region(region)
         data = _tmdb_get(f"/movie/{tmdb_id}/watch/providers")
-        uk = data.get("results", {}).get(REGION, {})
-        flatrate = uk.get("flatrate", [])
+        region_data = data.get("results", {}).get(streaming_region, {})
+        flatrate = region_data.get("flatrate", [])
         names = []
         seen = set()
         for provider in flatrate:
@@ -225,13 +237,16 @@ def fetch_movie_keywords(tmdb_id: int) -> list[dict]:
         return []
 
 
-def attach_streaming_platforms(movies: list[dict]) -> list[dict]:
-    """Attach UK streaming providers and return only streamable movies."""
+def attach_streaming_platforms(
+    movies: list[dict],
+    region: str | None = None,
+) -> list[dict]:
+    """Attach streaming providers and return only streamable movies."""
     if not movies:
         return []
 
     def _with_providers(movie):
-        streaming_platforms = fetch_movie_watch_providers(movie["id"])
+        streaming_platforms = fetch_movie_watch_providers(movie["id"], region=region)
         if not streaming_platforms:
             return None
 
@@ -245,7 +260,7 @@ def attach_streaming_platforms(movies: list[dict]) -> list[dict]:
     return [movie for movie in checked_movies if movie]
 
 
-def store_loaded_movies(movies: list[dict]) -> int:
+def store_loaded_movies(movies: list[dict], region: str | None = None) -> int:
     """Persist TMDb result dictionaries that were loaded for a page."""
     if not movies:
         return 0
@@ -256,7 +271,7 @@ def store_loaded_movies(movies: list[dict]) -> int:
 
     for item in movies:
         try:
-            if _process_movie(item, genre_map):
+            if _process_movie(item, genre_map, region=region):
                 saved_count += 1
         except Exception as e:
             logger.error(f"Error saving loaded movie {item.get('id')}: {e}")
@@ -264,27 +279,42 @@ def store_loaded_movies(movies: list[dict]) -> int:
     return saved_count
 
 
-def fetch_and_store_movies(pages: int = 5, list_type: str = "popular"):
+def fetch_and_store_movies(
+    pages: int = 5,
+    list_type: str = "popular",
+    region: str | None = None,
+):
     """
     Fetch movies from TMDb (popular/top_rated/now_playing) and store with embeddings.
     list_type: 'popular' | 'top_rated' | 'now_playing'
     """
     fetch_and_store_genres()
     genre_map = {g.name: g for g in Genre.objects.all()}
+    streaming_region = _streaming_region(region)
 
     total_saved = 0
 
     for page in range(1, pages + 1):
-        logger.info(f"Fetching page {page}/{pages} ({list_type})...")
+        logger.info(f"Fetching page {page}/{pages} ({list_type}, {streaming_region})...")
         try:
-            data = _tmdb_get(f"/movie/{list_type}", params={"page": page})
+            data = _fetch_movie_list_page(list_type, page, streaming_region)
         except Exception as e:
             logger.error(f"Failed to fetch page {page}: {e}")
             continue
 
-        for item in data.get("results", []):
+        new_movies = _exclude_existing_movies(data.get("results", []))
+        logger.info(
+            f"Skipped {len(data.get('results', [])) - len(new_movies)} existing movies on page {page}."
+        )
+
+        streamable_movies = attach_streaming_platforms(new_movies, region=streaming_region)
+        logger.info(
+            f"Found {len(streamable_movies)} streamable movies on page {page}."
+        )
+
+        for item in streamable_movies:
             try:
-                if _process_movie(item, genre_map):
+                if _process_movie(item, genre_map, region=streaming_region):
                     total_saved += 1
             except Exception as e:
                 logger.error(f"Error processing movie {item.get('id')}: {e}")
@@ -292,12 +322,69 @@ def fetch_and_store_movies(pages: int = 5, list_type: str = "popular"):
     logger.info(f"Done. Saved/filled {total_saved} movies.")
     return total_saved
 
-def _process_movie(item: dict, genre_map: dict) -> bool:
-    """Fetch details and store a movie unless it is already embedded."""
+
+def _exclude_existing_movies(movies: list[dict]) -> list[dict]:
+    tmdb_ids = [movie.get("id") for movie in movies if movie.get("id")]
+    if not tmdb_ids:
+        return []
+
+    existing_tmdb_ids = set(
+        Movie.objects.filter(tmdb_id__in=tmdb_ids).values_list("tmdb_id", flat=True)
+    )
+    return [movie for movie in movies if movie.get("id") not in existing_tmdb_ids]
+
+
+def _fetch_movie_list_page(list_type: str, page: int, region: str) -> dict:
+    if list_type == "popular":
+        return _tmdb_get(
+            "/discover/movie",
+            params={
+                "language": "en-GB",
+                "page": page,
+                "sort_by": "popularity.desc",
+                "include_adult": "false",
+                **_streaming_params(region),
+            },
+        )
+
+    if list_type == "top_rated":
+        return _tmdb_get(
+            "/discover/movie",
+            params={
+                "language": "en-GB",
+                "page": page,
+                "sort_by": "vote_average.desc",
+                "vote_count.gte": 200,
+                "include_adult": "false",
+                **_streaming_params(region),
+            },
+        )
+
+    return _tmdb_get(
+        f"/movie/{list_type}",
+        params={"language": "en-GB", "page": page, "region": region},
+    )
+
+
+def _process_movie(
+    item: dict,
+    genre_map: dict,
+    region: str | None = None,
+) -> bool:
+    """Fetch details and store a streamable movie with metadata and embeddings."""
     tmdb_id = item["id"]
 
-    if Movie.objects.filter(tmdb_id=tmdb_id, embedding__isnull=False).exists():
-        logger.info(f"Skipping already-loaded movie {tmdb_id}.")
+    if Movie.objects.filter(tmdb_id=tmdb_id).exists():
+        logger.info(f"Skipping existing movie {tmdb_id}.")
+        return False
+
+    platform_names = item.get("streaming_platforms") or fetch_movie_watch_providers(
+        tmdb_id,
+        region=region,
+    )
+
+    if not platform_names:
+        logger.info(f"Skipping non-streamable movie {tmdb_id}.")
         return False
 
     # Fetch full details (includes runtime)
@@ -325,27 +412,26 @@ def _process_movie(item: dict, genre_map: dict) -> bool:
         )
         keyword_objects.append(keyword_obj)
 
-    # Compute embedding
     genre_names = [g.name for g in genre_objects]
     keyword_names = [keyword.name for keyword in keyword_objects]
     text = build_movie_text(title, overview, genre_names, keyword_names)
     embedding = compute_embedding(text)
 
-    movie, _ = Movie.objects.update_or_create(
-        tmdb_id=tmdb_id,
-        defaults={
-            "title": title,
-            "overview": overview,
-            "release_date": details.get("release_date") or None,
-            "runtime": details.get("runtime") or None,
-            "poster_path": details.get("poster_path") or "",
-            "backdrop_path": details.get("backdrop_path") or "",
-            "vote_average": details.get("vote_average") or 0,
-            "vote_count": details.get("vote_count") or 0,
-            "popularity": details.get("popularity") or 0,
-            "embedding": embedding,
-        },
-    )
+    movie_defaults = {
+        "title": title,
+        "overview": overview,
+        "release_date": details.get("release_date") or None,
+        "runtime": details.get("runtime") or None,
+        "poster_path": details.get("poster_path") or "",
+        "backdrop_path": details.get("backdrop_path") or "",
+        "vote_average": details.get("vote_average") or 0,
+        "vote_count": details.get("vote_count") or 0,
+        "popularity": details.get("popularity") or 0,
+    }
+
+    movie_defaults["embedding"] = embedding
+
+    movie = Movie.objects.create(tmdb_id=tmdb_id, **movie_defaults)
 
     if genre_objects:
         movie.genres.set(genre_objects)
@@ -357,8 +443,6 @@ def _process_movie(item: dict, genre_map: dict) -> bool:
     else:
         movie.keywords.clear()
 
-    # Streaming platforms
-    platform_names = item.get("streaming_platforms") or fetch_movie_watch_providers(tmdb_id)
     for platform_name in platform_names:
         StreamingPlatform.objects.get_or_create(name=platform_name)
     platforms = StreamingPlatform.objects.filter(name__in=platform_names)

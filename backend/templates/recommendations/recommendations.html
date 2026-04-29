@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}For You — After The Credits{% endblock %}
+
+{% block content %}
+<section class="recs-page">
+
+  <header class="recs-header">
+    <div class="recs-header-text">
+      <h1 class="recs-title">PICKED FOR YOU</h1>
+      <p class="recs-subtitle">
+        Based on {{ request.user.journalentry_set.count }} journal entr{% if request.user.journalentry_set.count == 1 %}y{% else %}ies{% endif %}
+      </p>
+    </div>
+    <form method="post" action="{% url 'recommendations:refresh' %}">
+      {% csrf_token %}
+      <button type="submit" class="btn-refresh">
+        ↻ REFRESH
+      </button>
+    </form>
+  </header>
+
+  {% if not has_recs %}
+  <div class="recs-empty">
+    <div class="recs-empty-reel">[ ]</div>
+    <h2 class="recs-empty-title">Nothing to show yet.</h2>
+    <p class="recs-empty-body">
+      Write a journal entry for at least one film you've seen, then hit
+      <strong>Refresh</strong> to generate your first picks.
+    </p>
+    <div class="recs-empty-actions">
+      <a href="{% url 'movies:browse' %}" class="btn-cream-outline">BROWSE FILMS</a>
+      <a href="{% url 'journal:list' %}" class="btn-cream-outline">YOUR JOURNAL</a>
+    </div>
+  </div>
+
+  {% else %}
+
+  <ul class="recs-grid" role="list">
+    {% for rec in recs %}
+    {% with movie=rec.movie %}
+    <li class="rec-card">
+
+      <a href="{% url 'movies:details' movie.id %}" class="rec-poster-link">
+        {% if movie.poster_url %}
+          <img
+            src="{{ movie.poster_url }}"
+            alt="{{ movie.title }} poster"
+            class="rec-poster"
+            loading="lazy"
+          >
+        {% else %}
+          <div class="rec-poster rec-poster--blank">
+            <span>NO POSTER</span>
+          </div>
+        {% endif %}
+
+        <div class="rec-score-badge">
+          {{ rec.score|floatformat:2 }}
+        </div>
+      </a>
+
+      <div class="rec-body">
+
+        <a href="{% url 'movies:details' movie.id %}" class="rec-title">
+          {{ movie.title }}
+        </a>
+
+        <p class="rec-meta">
+          {% if movie.release_date %}{{ movie.release_date|date:"Y" }}{% endif %}
+          {% if movie.runtime %}· {{ movie.runtime }}m{% endif %}
+          {% if movie.vote_average %}· ★ {{ movie.vote_average|floatformat:1 }}{% endif %}
+        </p>
+
+        {% if movie.genres.all %}
+        <div class="rec-genres">
+          {% for genre in movie.genres.all %}
+            <span class="rec-genre-pill">{{ genre.name }}</span>
+          {% endfor %}
+        </div>
+        {% endif %}
+
+        <p class="rec-explanation">{{ rec.explanation }}</p>
+
+        {% if rec.journal_snippet %}
+        <blockquote class="rec-snippet">
+          "{{ rec.journal_snippet|truncatechars:120 }}"
+        </blockquote>
+        {% endif %}
+
+        <div class="rec-actions">
+          <a href="{% url 'movies:details' movie.id %}" class="rec-btn">VIEW FILM</a>
+          <a href="{% url 'journal:create' movie.id %}" class="rec-btn rec-btn--ghost">✎ JOURNAL</a>
+          <form method="post" action="{% url 'movies:toggle_wishlist' movie.id %}" style="display:inline;">
+            {% csrf_token %}
+            <button type="submit" class="rec-btn rec-btn--ghost">☆ SAVE</button>
+          </form>
+        </div>
+
+      </div>
+
+    </li>
+    {% endwith %}
+    {% endfor %}
+  </ul>
+
+  {% endif %}
+
+</section>
+{% endblock %}

@@ -58,6 +58,17 @@
         </option>
       {% endfor %}
     </select>
+
+    <select class="filter-select" name="sort_by" aria-label="Sort movies" onchange="this.form.submit()">
+      <option value="popularity.desc" {% if sort_by == "popularity.desc" %}selected{% endif %}>Most popular</option>
+      <option value="popularity.asc" {% if sort_by == "popularity.asc" %}selected{% endif %}>Least popular</option>
+      <option value="vote_average.desc" {% if sort_by == "vote_average.desc" %}selected{% endif %}>Highest rated</option>
+      <option value="vote_average.asc" {% if sort_by == "vote_average.asc" %}selected{% endif %}>Lowest rated</option>
+      <option value="release_date.desc" {% if sort_by == "release_date.desc" %}selected{% endif %}>Newest</option>
+      <option value="release_date.asc" {% if sort_by == "release_date.asc" %}selected{% endif %}>Oldest</option>
+      <option value="title.asc" {% if sort_by == "title.asc" %}selected{% endif %}>Title A-Z</option>
+      <option value="title.desc" {% if sort_by == "title.desc" %}selected{% endif %}>Title Z-A</option>
+    </select>
   </div>
 </form>
 
