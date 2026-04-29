@@ -19,17 +19,17 @@
         </a>
 
         <ul class="navbar__links">
-            <li><a href="{% url 'movies:browse' %}">Browse</a></li>
+            <li><a href="{% url 'movies:browse' %}" class="{% if request.resolver_match.app_name == 'movies' and request.resolver_match.url_name != 'wishlist' %}is-active{% endif %}">Browse</a></li>
             <li><a href="#">About</a></li>
             {% if user.is_authenticated %}
-            <li><a href="{% url 'journal:list' %}">Journal</a></li>
-            <li><a href="{% url 'recommendations:list' %}">For You</a></li>
+            <li><a href="{% url 'journal:list' %}" class="{% if request.resolver_match.app_name == 'journal' %}is-active{% endif %}">Journal</a></li>
+            <li><a href="{% url 'recommendations:list' %}" class="{% if request.resolver_match.app_name == 'recommendations' %}is-active{% endif %}">For You</a></li>
             <li>{% if user.is_authenticated %}
-                <a href="{% url 'movies:wishlist' %}" class="nav-link">WATCHLIST</a>
+                <a href="{% url 'movies:wishlist' %}" class="nav-link {% if request.resolver_match.app_name == 'movies' and request.resolver_match.url_name == 'wishlist' %}is-active{% endif %}">WATCHLIST</a>
                 {% endif %}
             </li>
             <li>{% if user.is_authenticated %}
-                <a href="{% url 'users:profile' %}" class="nav-link">PROFILE</a>
+                <a href="{% url 'users:profile' %}" class="nav-link {% if request.resolver_match.app_name == 'users' and request.resolver_match.url_name == 'profile' %}is-active{% endif %}">PROFILE</a>
                 {% endif %}
             </li>
             <li>

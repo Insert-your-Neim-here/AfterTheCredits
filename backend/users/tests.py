@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
@@ -8,6 +10,76 @@ from users.services.profile_embedding import (
     build_profile_embedding,
     update_user_profile_embedding,
 )
+
+
+class AuthRoutingTests(TestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user(
+            email="route@example.com",
+            username="routeuser",
+            password="password12345",
+            is_email_verified=True,
+        )
+
+    def assert_redirects_to(self, response, url_name):
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response["Location"], reverse(url_name))
+
+    def test_home_redirects_authenticated_users_to_browse(self):
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse("core:home"))
+
+        self.assert_redirects_to(response, "movies:browse")
+
+    def test_authenticated_users_cannot_open_login_or_signup(self):
+        self.client.force_login(self.user)
+
+        login_response = self.client.get(reverse("users:login"))
+        signup_response = self.client.get(reverse("users:signup"))
+
+        self.assert_redirects_to(login_response, "movies:browse")
+        self.assert_redirects_to(signup_response, "movies:browse")
+
+    def test_login_redirects_to_browse_by_default(self):
+        response = self.client.post(reverse("users:login"), {
+            "email": "route@example.com",
+            "password": "password12345",
+        })
+
+        self.assert_redirects_to(response, "movies:browse")
+
+    def test_login_redirects_to_browse_even_with_next_url(self):
+        response = self.client.post(
+            f"{reverse('users:login')}?next={reverse('journal:list')}",
+            {
+                "email": "route@example.com",
+                "password": "password12345",
+            },
+        )
+
+        self.assert_redirects_to(response, "movies:browse")
+
+    @patch("users.views.verify_code", return_value=True)
+    def test_verified_signup_redirects_to_browse(self, _verify_code):
+        session = self.client.session
+        session["pending_signup"] = {
+            "email": "new-route@example.com",
+            "password": "password12345",
+            "streaming_platform_ids": [],
+        }
+        session.save()
+
+        response = self.client.post(reverse("users:verify_email"), {"code": "123456"})
+
+        self.assert_redirects_to(response, "movies:browse")
+
+    def test_logout_redirects_to_home(self):
+        self.client.force_login(self.user)
+
+        response = self.client.post(reverse("users:logout"))
+
+        self.assert_redirects_to(response, "core:home")
 
 
 class ProfileEmbeddingTests(TestCase):

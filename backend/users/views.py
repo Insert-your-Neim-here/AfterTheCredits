@@ -1,18 +1,15 @@
-
-# Create your views here.
-# users/views.py
-from django.shortcuts import render, redirect
 from django.contrib.auth import (
+    authenticate,
     get_user_model,
     login,
     logout,
-    authenticate,
     update_session_auth_hash,
 )
+from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import PasswordChangeForm
 from django.contrib import messages
-from django.contrib.auth.decorators import login_required
 from django.db.models import Count
+from django.shortcuts import redirect, render
 from django.views.decorators.http import require_http_methods
 
 from journal.services import get_user_journal_entries
@@ -28,7 +25,7 @@ User = get_user_model()
 @require_http_methods(['GET', 'POST'])
 def signup_view(request):
     if request.user.is_authenticated:
-        return redirect('core:home')
+        return redirect('movies:browse')
 
     form = SignupForm(request.POST or None)
 
@@ -84,7 +81,7 @@ def verify_email_view(request):
             del request.session['pending_signup']
             login(request, user, backend='django.contrib.auth.backends.ModelBackend')
             messages.success(request, 'Email verified! Welcome to After The Credits.')
-            return redirect('core:home')
+            return redirect('movies:browse')
         else:
             form.add_error('code', 'Invalid or expired code. Please try again.')
 
@@ -105,7 +102,7 @@ def resend_code_view(request):
 @require_http_methods(['GET', 'POST'])
 def login_view(request):
     if request.user.is_authenticated:
-        return redirect('core:home')
+        return redirect('movies:browse')
 
     form = LoginForm(request.POST or None)
 
@@ -123,8 +120,7 @@ def login_view(request):
                 return redirect('users:verify_email')
 
             login(request, user)
-            next_url = request.GET.get('next', 'core:home')
-            return redirect(next_url)
+            return redirect('movies:browse')
         else:
             form.add_error(None, 'Invalid email or password.')
 
@@ -134,7 +130,7 @@ def login_view(request):
 @login_required
 def logout_view(request):
     logout(request)
-    return redirect('users:login')
+    return redirect('core:home')
 
 @login_required
 def profile_view(request):

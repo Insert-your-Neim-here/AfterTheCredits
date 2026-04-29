@@ -1,18 +1,19 @@
+from django.shortcuts import get_object_or_404
+
 from core.services.embedding_service import compute_embedding, get_embedding_model
 from users.services.profile_embedding import update_user_profile_embedding
 from .models import JournalEntry
 
-# ── Survey step definitions ────────────────────────────────────────────────────
 SURVEY_STEPS = [
-    {"key": "is_positive",        "question": "Did you enjoy the movie overall?",      "step": 1},
-    {"key": "liked_genre",        "question": "Did you like the genre?",               "step": 2},
-    {"key": "liked_story",        "question": "Did you enjoy the story and writing?",  "step": 3},
-    {"key": "liked_performances", "question": "Did you enjoy the performances?",       "step": 4},
-    {"key": "would_rewatch",      "question": "Would you watch it again?",             "step": 5},
+    {"key": "is_positive", "question": "Did you enjoy the movie overall?", "step": 1},
+    {"key": "liked_genre", "question": "Did you like the genre?", "step": 2},
+    {"key": "liked_story", "question": "Did you enjoy the story and writing?", "step": 3},
+    {"key": "liked_performances", "question": "Did you enjoy the performances?", "step": 4},
+    {"key": "would_rewatch", "question": "Would you watch it again?", "step": 5},
 ]
 
-TOTAL_STEPS = len(SURVEY_STEPS)   # 5 survey questions
-TEXT_STEP   = TOTAL_STEPS + 1     # step 6 = free-text
+TOTAL_STEPS = len(SURVEY_STEPS)
+TEXT_STEP = TOTAL_STEPS + 1
 SESSION_KEY = "journal_survey"
 
 
@@ -50,11 +51,11 @@ def save_entry_with_embedding(entry: JournalEntry) -> JournalEntry:
 def create_entry_from_session(request, movie) -> JournalEntry:
     survey = get_survey_from_session(request)
     entry, _ = JournalEntry.objects.get_or_create(user=request.user, movie=movie)
-    entry.is_positive        = survey.get("is_positive")
-    entry.liked_genre        = survey.get("liked_genre")
-    entry.liked_story        = survey.get("liked_story")
+    entry.is_positive = survey.get("is_positive")
+    entry.liked_genre = survey.get("liked_genre")
+    entry.liked_story = survey.get("liked_story")
     entry.liked_performances = survey.get("liked_performances")
-    entry.would_rewatch      = survey.get("would_rewatch")
+    entry.would_rewatch = survey.get("would_rewatch")
     return entry
 
 
@@ -67,5 +68,4 @@ def get_user_journal_entries(user):
 
 
 def get_entry_for_user(entry_id: int, user):
-    from django.shortcuts import get_object_or_404
     return get_object_or_404(JournalEntry, id=entry_id, user=user)

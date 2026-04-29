@@ -1,24 +1,25 @@
-from django.shortcuts import render
-
-# Create your views here.
+from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import get_object_or_404, redirect, render
-from django.contrib import messages
-from django.views.decorators.http import require_POST
 
 from movies.models import Movie
 from users.services.profile_embedding import update_user_profile_embedding
-from .forms import JournalTextForm, JournalEditForm
+from .forms import JournalEditForm, JournalTextForm
 from .models import JournalEntry
 from .services import (
-    SURVEY_STEPS, TOTAL_STEPS, TEXT_STEP, SESSION_KEY,
-    get_step_data, save_answer_to_session, get_survey_from_session,
-    clear_survey_session, save_entry_with_embedding,
-    create_entry_from_session, get_user_journal_entries, get_entry_for_user,
+    SURVEY_STEPS,
+    TEXT_STEP,
+    TOTAL_STEPS,
+    clear_survey_session,
+    create_entry_from_session,
+    get_entry_for_user,
+    get_step_data,
+    get_survey_from_session,
+    get_user_journal_entries,
+    save_answer_to_session,
+    save_entry_with_embedding,
 )
 
-
-# ── Journal list ───────────────────────────────────────────────────────────────
 
 @login_required
 def journal_list_view(request):
@@ -26,21 +27,17 @@ def journal_list_view(request):
     return render(request, "journal/journal_list.html", {"entries": entries})
 
 
-# ── Multi-step survey ──────────────────────────────────────────────────────────
-
 @login_required
 def survey_start_view(request, tmdb_id):
     """Clear any stale session data and redirect to step 1."""
     movie = get_object_or_404(Movie, tmdb_id=tmdb_id)
 
-    # If entry already exists, redirect to edit
     existing = JournalEntry.objects.filter(user=request.user, movie=movie).first()
     if existing:
         messages.info(request, "You already have a journal entry for this film. Edit it below.")
         return redirect("journal:edit", entry_id=existing.pk)
 
     clear_survey_session(request)
-    # Store which movie we're journalling about
     request.session["journal_tmdb_id"] = tmdb_id
     request.session.modified = True
     return redirect("journal:survey_step", step=1)
@@ -59,7 +56,6 @@ def survey_step_view(request, step):
 
     movie = get_object_or_404(Movie, tmdb_id=tmdb_id)
 
-    # ── Steps 1–5: survey questions ────────────────────────────
     if 1 <= step <= TOTAL_STEPS:
         step_data = get_step_data(step)
         if not step_data:
@@ -71,8 +67,7 @@ def survey_step_view(request, step):
                 return redirect("journal:survey_step", step=step)
 
             save_answer_to_session(request, step_data["key"], answer == "yes")
-            next_step = step + 1
-            return redirect("journal:survey_step", step=next_step)
+            return redirect("journal:survey_step", step=step + 1)
 
         return render(request, "journal/survey_question.html", {
             "movie": movie,
@@ -82,12 +77,10 @@ def survey_step_view(request, step):
             "progress": int((step / (TOTAL_STEPS + 1)) * 100),
         })
 
-    # ── Step 6: free-text ──────────────────────────────────────
     if step == TEXT_STEP:
-        # Guard: must have answered all survey steps
         survey = get_survey_from_session(request)
-        for s in SURVEY_STEPS:
-            if s["key"] not in survey:
+        for survey_step in SURVEY_STEPS:
+            if survey_step["key"] not in survey:
                 return redirect("journal:survey_step", step=1)
 
         if request.method == "POST":
@@ -111,11 +104,8 @@ def survey_step_view(request, step):
             "progress": int((step / (TOTAL_STEPS + 1)) * 100),
         })
 
-    # Out of range
     return redirect("journal:survey_step", step=1)
 
-
-# ── Edit & Delete ──────────────────────────────────────────────────────────────
 
 @login_required
 def edit_entry_view(request, entry_id):

@@ -1,9 +1,9 @@
 import os
+import logging
 from concurrent.futures import ThreadPoolExecutor
 from urllib.parse import urlencode
 
 import requests
-import logging
 from django.conf import settings
 from django.core.cache import cache
 from movies.models import Movie, Genre, Keyword, StreamingPlatform, MovieCredit, Person
@@ -29,7 +29,7 @@ def _headers():
     }
 
 
-def _tmdb_get(path: str, params: dict = None) -> dict:  # type: ignore
+def _tmdb_get(path: str, params: dict | None = None) -> dict:
     params = params or {}
     cache_key = f"tmdb:{path}:{urlencode(sorted(params.items()), doseq=True)}"
     cached_data = cache.get(cache_key)
@@ -62,7 +62,6 @@ def _streaming_params(region: str | None = None) -> dict:
 def search_movies(
     query: str,
     page: int = 1,
-    uk_only: bool | None = None,
     region: str | None = None,
 ):
     data = _tmdb_get(
@@ -79,7 +78,6 @@ def search_movies(
 
 def popular_movies(
     page: int = 1,
-    uk_only: bool | None = None,
     region: str | None = None,
 ):
     data = _tmdb_get(
@@ -131,7 +129,6 @@ def discover_movies(
     text_query: str = "",
     keyword_ids: list[int] | None = None,
     sort_by: str = "popularity.desc",
-    uk_only: bool | None = None,
     region: str | None = None,
 ):
     params = {
@@ -458,8 +455,6 @@ def poster_url(poster_path: str | None):
     return f"{TMDB_IMAGE_BASE}{poster_path}"
 
 
-# ── Cast/crew helpers ──────────────────────────────────────────────────────
-
 MAX_ACTORS = 10  # top-billed cast members to store
 
 def fetch_and_store_credits(movie: Movie, tmdb_id: int) -> None:
@@ -480,7 +475,6 @@ def fetch_and_store_credits(movie: Movie, tmdb_id: int) -> None:
 
     to_create: list[MovieCredit] = []
 
-    # Crew — directors & writers
     for member in crew:
         job  = member.get("job", "")
         dept = member.get("department", "")
@@ -491,15 +485,14 @@ def fetch_and_store_credits(movie: Movie, tmdb_id: int) -> None:
             role = MovieCredit.ROLE_WRITER
         elif dept == "Writing":
             role = MovieCredit.ROLE_WRITER
-        elif job == "Producer":                  # ← add
-            role = MovieCredit.ROLE_PRODUCER    # ← add
+        elif job == "Producer":
+            role = MovieCredit.ROLE_PRODUCER
         else:
             continue
 
         person = _upsert_person(member)
         to_create.append(MovieCredit(movie=movie, person=person, role=role, order=0))
 
-    # Cast — top N billed
     for member in cast[:MAX_ACTORS]:
         person = _upsert_person(member)
         to_create.append(

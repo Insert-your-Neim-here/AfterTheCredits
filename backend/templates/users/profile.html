@@ -7,14 +7,10 @@
 <div class="profile-page">
 
   <header class="dossier-header">
-    <div class="dossier-stamp">MEMBER FILE</div>
     <div class="dossier-identity">
       <p class="dossier-kicker">After The Credits account</p>
       <p class="dossier-email">{{ request.user.email }}</p>
       <p class="dossier-since">On the books since {{ request.user.date_joined|date:"F Y" }}</p>
-    </div>
-    <div class="dossier-classification">
-      <span class="classification-tag">ACCOUNT</span>
     </div>
   </header>
 

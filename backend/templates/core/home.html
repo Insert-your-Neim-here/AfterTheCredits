@@ -9,26 +9,32 @@
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     @font-face {
       font-family: "DaysOne Regular";
-      src: url("{% static 'fonts/DaysOne-Regular.ttf' %}") format("truetype");
+      src: url("{% static 'fonts/CourierPrime-Bold.ttf' %}") format("truetype");
+      font-weight: 400 700;
     }
 
         @font-face {
       font-family: "Courier Prime";
       src: url("{% static 'fonts/CourierPrime-Bold.ttf' %}") format("truetype");
+      font-weight: 400 700;
     }
 
     :root {
       --black:   #000;
       --near-black: #1f1f1f;
       --cream:   #EFECE6;
+      --cream3:  #c8c4b8;
       --muted:   #888;
       --radius:  5px;
+      --mono: "Courier Prime", monospace;
+      --serif: "Courier Prime", monospace;
     }
 
     body {
       background: var(--near-black);
       color: var(--cream);
       font-family: "Courier Prime";
+      font-weight: 700;
       font-size: 14px;
       line-height: 1.5;
       min-height: 100vh;
@@ -427,8 +433,6 @@
   </div>
 
   <ul class="nav-links">
-    <li><a href="{% url 'movies:browse' %}">Browse</a></li>
-    <li><a href="#">About</a></li>
     <li><a href="{% url 'users:login' %}">Login</a></li>
   </ul>
 </nav>

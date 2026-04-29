@@ -1,6 +1,6 @@
 from datetime import date
 
-from django.shortcuts import render
+from django.shortcuts import redirect, render
 
 from movies.services.tmdb_client import (
     discover_movies,
@@ -17,6 +17,9 @@ def home_view(request):
     """
     Homepage - shows the hero, filmstrip, and the browseable movie grid.
     """
+    if request.user.is_authenticated:
+        return redirect("movies:browse")
+
     q = request.GET.get("q", "").strip()
     genre = request.GET.get("genre", "").strip()
     runtime = request.GET.get("runtime", "").strip()
