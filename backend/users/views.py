@@ -2,12 +2,24 @@
 # Create your views here.
 # users/views.py
 from django.shortcuts import render, redirect
-from django.contrib.auth import get_user_model, login, logout, authenticate
+from django.contrib.auth import (
+    get_user_model,
+    login,
+    logout,
+    authenticate,
+    update_session_auth_hash,
+)
+from django.contrib.auth.forms import PasswordChangeForm
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.db.models import Count
 from django.views.decorators.http import require_http_methods
 
-from .forms import SignupForm, LoginForm, VerificationCodeForm
+from journal.services import get_user_journal_entries
+from movies.models import Genre, StreamingPlatform
+from recommendations.services import get_negative_genre_signal_ids
+
+from .forms import LoginForm, ProfileForm, SignupForm, VerificationCodeForm
 from .services.email_service import send_verification_email, verify_code
 
 User = get_user_model()
@@ -123,3 +135,94 @@ def login_view(request):
 def logout_view(request):
     logout(request)
     return redirect('users:login')
+
+@login_required
+def profile_view(request):
+    selected_streaming_platform_ids = [
+        str(platform_id)
+        for platform_id in request.user.streaming_platforms.values_list("id", flat=True)
+    ]
+
+    if request.method == "POST":
+        if request.POST.get("account_action") == "change_password":
+            form = ProfileForm(instance=request.user)
+            password_form = PasswordChangeForm(request.user, request.POST)
+            if password_form.is_valid():
+                user = password_form.save()
+                update_session_auth_hash(request, user)
+                messages.success(request, "Password updated.")
+                return redirect("users:profile")
+        else:
+            form = ProfileForm(request.POST, instance=request.user)
+            password_form = PasswordChangeForm(request.user)
+            selected_streaming_platform_ids = request.POST.getlist("streaming_platforms")
+            if form.is_valid():
+                form.save()
+                # Regenerate recommendations now that platforms may have changed
+                try:
+                    from recommendations.services import generate_recommendations
+                    generate_recommendations(request.user)
+                except Exception:
+                    pass
+                messages.success(request, "Streaming services updated.")
+                return redirect("users:profile")
+    else:
+        form = ProfileForm(instance=request.user)
+        password_form = PasswordChangeForm(request.user)
+
+    journal_entries = get_user_journal_entries(request.user)
+    all_platforms   = StreamingPlatform.objects.all()
+
+    # Stats
+    total_entries  = journal_entries.count()
+    positive_count = journal_entries.filter(is_positive=True).count()
+    rewatch_count  = journal_entries.filter(would_rewatch=True).count()
+
+    taste_entries = list(journal_entries.prefetch_related("movie__genres"))
+    negative_genre_ids = get_negative_genre_signal_ids(taste_entries)
+
+    # Favourite genres across journalled films, excluding genres with any
+    # negative taste signal so they don't appear as favourites.
+    top_genres = list(
+        journal_entries
+        .values("movie__genres__id", "movie__genres__name")
+        .annotate(c=Count("movie__genres__id"))
+        .exclude(movie__genres__id=None)
+        .exclude(movie__genres__id__in=negative_genre_ids)
+        .order_by("-c")[:5]
+    )
+
+    negative_genres = Genre.objects.filter(id__in=negative_genre_ids).order_by("name")
+
+    max_count = max([row["c"] for row in top_genres] + [1])
+    taste_genres = [
+        {
+            "name": row["movie__genres__name"],
+            "count": row["c"],
+            "width": round((row["c"] / max_count) * 100),
+            "is_negative": False,
+        }
+        for row in top_genres
+    ]
+    taste_genres.extend(
+        {
+            "name": genre.name,
+            "count": 0,
+            "width": 100,
+            "is_negative": True,
+        }
+        for genre in negative_genres
+    )
+
+    context = {
+        "form":           form,
+        "password_form":  password_form,
+        "selected_streaming_platform_ids": selected_streaming_platform_ids,
+        "all_platforms":  all_platforms,
+        "total_entries":  total_entries,
+        "positive_count": positive_count,
+        "rewatch_count":  rewatch_count,
+        "top_genres":     top_genres,
+        "taste_genres":   taste_genres,
+    }
+    return render(request, "users/profile.html", context)

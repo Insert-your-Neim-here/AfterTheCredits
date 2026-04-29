@@ -70,3 +70,21 @@ class VerificationCodeForm(forms.Form):
 
     def clean_code(self):
         return self.cleaned_data['code'].strip()
+
+
+
+class ProfileForm(forms.ModelForm):
+    streaming_platforms = forms.ModelMultipleChoiceField(
+        queryset=StreamingPlatform.objects.none(),
+        widget=forms.CheckboxSelectMultiple,
+        required=False,
+        label="Your streaming platforms",
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['streaming_platforms'].queryset = StreamingPlatform.objects.order_by('name')
+
+    class Meta:
+        model  = User
+        fields = ["streaming_platforms"]

@@ -1,8 +1,9 @@
 from django.contrib.auth import get_user_model
 from django.test import TestCase
+from django.urls import reverse
 
 from journal.models import JournalEntry
-from movies.models import Movie
+from movies.models import Genre, Movie
 from users.services.profile_embedding import (
     build_profile_embedding,
     update_user_profile_embedding,
@@ -68,3 +69,57 @@ class ProfileEmbeddingTests(TestCase):
 
         self.assertIsNone(profile)
         self.assertIsNone(self.user.profile_embedding)
+
+
+class ProfileTasteTests(TestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user(
+            email="taste@example.com",
+            username="tasteuser",
+            password="password",
+        )
+
+    def test_negative_genre_is_not_top_genre_but_appears_in_taste_profile(self):
+        comedy = Genre.objects.create(tmdb_id=35, name="Comedy")
+        drama = Genre.objects.create(tmdb_id=18, name="Drama")
+        comedy_movie = Movie.objects.create(tmdb_id=101, title="Bad Comedy")
+        drama_movie = Movie.objects.create(tmdb_id=102, title="Good Drama")
+        comedy_movie.genres.add(comedy)
+        drama_movie.genres.add(drama)
+
+        JournalEntry.objects.create(
+            user=self.user,
+            movie=comedy_movie,
+            raw_text="I did not like this genre.",
+            is_positive=True,
+            liked_genre=False,
+            liked_story=True,
+            liked_performances=True,
+            would_rewatch=True,
+        )
+        JournalEntry.objects.create(
+            user=self.user,
+            movie=drama_movie,
+            raw_text="This worked for me.",
+            is_positive=True,
+            liked_genre=True,
+            liked_story=True,
+            liked_performances=True,
+            would_rewatch=True,
+        )
+
+        self.client.force_login(self.user)
+        response = self.client.get(reverse("users:profile"))
+
+        top_genre_names = {
+            row["movie__genres__name"] for row in response.context["top_genres"]
+        }
+        negative_taste_genres = {
+            row["name"]
+            for row in response.context["taste_genres"]
+            if row["is_negative"]
+        }
+
+        self.assertNotIn("Comedy", top_genre_names)
+        self.assertIn("Drama", top_genre_names)
+        self.assertIn("Comedy", negative_taste_genres)

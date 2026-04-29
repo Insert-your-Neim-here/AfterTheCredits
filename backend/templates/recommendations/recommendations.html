@@ -14,11 +14,14 @@
       </p>
     </div>
     {% if can_generate %}
-    <form method="post" action="{% url 'recommendations:refresh' %}">
-      {% csrf_token %}
-      <button type="submit" class="btn-refresh">
-        ↻ REFRESH
-      </button>
+    <form method="get" class="recs-runtime-filter">
+      <label for="runtime" class="recs-runtime-label">WATCH SESSION</label>
+      <select id="runtime" name="runtime" class="recs-runtime-select" onchange="this.form.submit()">
+        <option value="" {% if not runtime_minutes %}selected{% endif %}>Any runtime</option>
+        {% for minutes, label in runtime_choices %}
+          <option value="{{ minutes }}" {% if runtime_minutes == minutes %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
     </form>
     {% endif %}
   </header>
@@ -33,15 +36,20 @@
       so your recommendations have enough taste signals to work from.
     </p>
     {% else %}
-    <h2 class="recs-empty-title">Nothing to show yet.</h2>
+    <h2 class="recs-empty-title">
+      {% if unfiltered_has_recs and runtime_minutes %}
+        No picks fit that watch session.
+      {% else %}
+        Nothing to show yet.
+      {% endif %}
+    </h2>
     <p class="recs-empty-body">
-      You have enough journal entries. Hit
-      <strong>Refresh</strong> to generate your first picks.
+      {% if unfiltered_has_recs and runtime_minutes %}
+        Try a longer runtime, or browse films to find something shorter.
+      {% else %}
+        You have enough journal entries. Your first picks will appear here soon.
+      {% endif %}
     </p>
-    <form method="post" action="{% url 'recommendations:refresh' %}" class="recs-empty-actions">
-      {% csrf_token %}
-      <button type="submit" class="btn-cream-outline">REFRESH PICKS</button>
-    </form>
     {% endif %}
     <div class="recs-empty-actions">
       <a href="{% url 'movies:browse' %}" class="btn-cream-outline">BROWSE FILMS</a>

@@ -12,7 +12,7 @@ Strategy
    - story/writing (liked_story) boosts matching writers/directors
    - performances (liked_performances) boosts matching top-billed actors
    - rewatchability (would_rewatch) strengthens matches to that whole movie
-   - negative signal (is_positive=False) penalizes genre-similar movies
+   - negative signals exclude genre-similar movies
 4. Filter by user streaming platforms, if the user has set any.
 5. Exclude films the user has already journaled.
 6. Return top-N Recommendation objects with a plain-English explanation.
@@ -47,10 +47,10 @@ OVERALL_CREW_BOOST = 0.10
 STORY_CREW_BOOST = 0.10
 PERFORMANCE_BOOST = 0.10
 REWATCH_MULTIPLIER = 1.20  # strengthens matches to rewatchable movies
-NEGATIVE_PENALTY = 0.60  # score multiplied for negative genre clusters
 MIN_SCORE = 0.10  # discard anything below this threshold
 MAIN_ACTOR_LIMIT = 5
 EXPLANATION_NAME_LIMIT = 2
+NEGATIVE_GENRE_SIGNAL_THRESHOLD = 2
 
 
 def _movie_genre_ids(movie: Movie | None) -> set[int]:
@@ -120,13 +120,51 @@ def _liked_genre_ids(entries: list[JournalEntry]) -> set[int]:
     return ids
 
 
-def _negative_genre_ids(entries: list[JournalEntry]) -> set[int]:
-    """Genre IDs from entries the user marked as negative overall."""
+def _is_negative_taste_signal(entry: JournalEntry) -> bool:
+    """
+    Treat a film as disliked when the user answered No to at least 3 of 5
+    survey questions, or when the overall enjoyment answer is explicitly No.
+    """
+    return entry.is_positive is False or (
+        entry.survey_score is not None and entry.survey_score <= 2
+    )
+
+
+def _has_negative_genre_signal(entry: JournalEntry) -> bool:
+    return entry.liked_genre is False or _is_negative_taste_signal(entry)
+
+
+def _excluded_genre_ids(entries: list[JournalEntry]) -> set[int]:
+    """
+    Genres that should not be recommended again after repeated negative signals.
+
+    A single disappointing film should not block a genre. Once the same genre is
+    disliked across multiple journal entries, stop recommending that genre.
+    """
+    negative_counts: dict[int, int] = {}
+    for entry in entries:
+        if not _has_negative_genre_signal(entry):
+            continue
+        for genre_id in _movie_genre_ids(entry.movie):
+            negative_counts[genre_id] = negative_counts.get(genre_id, 0) + 1
+
+    return {
+        genre_id
+        for genre_id, count in negative_counts.items()
+        if count >= NEGATIVE_GENRE_SIGNAL_THRESHOLD
+    }
+
+
+def get_negative_genre_signal_ids(entries: list[JournalEntry]) -> set[int]:
     ids: set[int] = set()
     for entry in entries:
-        if entry.is_positive is False:
+        if _has_negative_genre_signal(entry):
             ids.update(_movie_genre_ids(entry.movie))
     return ids
+
+
+def get_excluded_genre_ids(entries: list[JournalEntry]) -> set[int]:
+    return _excluded_genre_ids(entries)
 
 
 def _person_ids_from_entries(
@@ -242,8 +280,11 @@ def generate_recommendations(user: "User") -> QuerySet[Recommendation]:
     # 2. Fetch candidate movies via pgvector cosine similarity.
     excluded_ids = _journalled_movie_ids(entries)
     platform_ids = _get_platform_ids(user)
+    excluded_genres = _excluded_genre_ids(entries)
 
     qs = Movie.objects.exclude(id__in=excluded_ids).filter(embedding__isnull=False)
+    if excluded_genres:
+        qs = qs.exclude(genres__id__in=excluded_genres)
 
     if platform_ids:
         qs = qs.filter(streaming_platforms__id__in=platform_ids).distinct()
@@ -263,6 +304,7 @@ def generate_recommendations(user: "User") -> QuerySet[Recommendation]:
         candidates = list(
             Movie.objects.exclude(id__in=excluded_ids)
             .filter(embedding__isnull=False)
+            .exclude(genres__id__in=excluded_genres)
             .annotate(vector_distance=CosineDistance("embedding", profile_vector))
             .order_by("vector_distance")
             .prefetch_related("genres", "streaming_platforms", "credits__person")[:CANDIDATE_POOL]
@@ -270,7 +312,6 @@ def generate_recommendations(user: "User") -> QuerySet[Recommendation]:
 
     # 3. Re-rank with survey signals.
     liked_genres = _liked_genre_ids(entries)
-    negative_genres = _negative_genre_ids(entries)
     entry_map = {entry.movie_id: entry for entry in entries if entry.movie_id is not None}
 
     rewatch_yes_entries = {entry for entry in entries if entry.would_rewatch is True}
@@ -366,6 +407,9 @@ def generate_recommendations(user: "User") -> QuerySet[Recommendation]:
         if movie_genre_ids & liked_genres:
             score += GENRE_BOOST
 
+        if movie_genre_ids & excluded_genres:
+            continue
+
         if movie_overall_crew_ids & positive_crew_ids:
             score += OVERALL_CREW_BOOST
 
@@ -381,9 +425,6 @@ def generate_recommendations(user: "User") -> QuerySet[Recommendation]:
             or movie_actor_ids & rewatch_actor_ids
         ):
             score *= REWATCH_MULTIPLIER
-
-        if movie_genre_ids & negative_genres:
-            score *= NEGATIVE_PENALTY
 
         if score >= MIN_SCORE:
             scored.append((score, movie))

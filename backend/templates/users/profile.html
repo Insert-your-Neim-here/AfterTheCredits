@@ -1,0 +1,287 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Profile - After The Credits{% endblock %}
+
+{% block content %}
+<div class="profile-page">
+
+  <header class="dossier-header">
+    <div class="dossier-stamp">MEMBER FILE</div>
+    <div class="dossier-identity">
+      <p class="dossier-kicker">After The Credits account</p>
+      <p class="dossier-email">{{ request.user.email }}</p>
+      <p class="dossier-since">On the books since {{ request.user.date_joined|date:"F Y" }}</p>
+    </div>
+    <div class="dossier-classification">
+      <span class="classification-tag">ACCOUNT</span>
+    </div>
+  </header>
+
+  <section class="stat-strip">
+    <div class="stat-block">
+      <span class="stat-number">{{ total_entries }}</span>
+      <span class="stat-label">Films logged</span>
+    </div>
+    <div class="stat-divider">|</div>
+    <div class="stat-block">
+      <span class="stat-number">{{ positive_count }}</span>
+      <span class="stat-label">Enjoyed</span>
+    </div>
+    <div class="stat-divider">|</div>
+    <div class="stat-block">
+      <span class="stat-number">{{ rewatch_count }}</span>
+      <span class="stat-label">Would rewatch</span>
+    </div>
+    {% if top_genres %}
+    <div class="stat-divider">|</div>
+    <div class="stat-block stat-block--genres">
+      <span class="stat-label">Top genres</span>
+      <span class="stat-genres">
+        {% for g in top_genres %}
+          <span class="stat-genre-pill">{{ g.movie__genres__name }}</span>
+        {% endfor %}
+      </span>
+    </div>
+    {% endif %}
+  </section>
+
+  <div class="profile-body profile-body--settings">
+    <aside class="profile-sidebar">
+      <div class="sidebar-section sidebar-section--account">
+        <h2 class="sidebar-heading">
+          <span class="sidebar-heading-rule"></span>
+          Account file
+        </h2>
+        <dl class="profile-file-list">
+          <div>
+            <dt>Services</dt>
+            <dd>{{ selected_streaming_platform_ids|length }} selected</dd>
+          </div>
+          <div>
+            <dt>Status</dt>
+            <dd>{% if request.user.is_email_verified %}Verified{% else %}Unverified{% endif %}</dd>
+          </div>
+        </dl>
+      </div>
+
+      {% if taste_genres %}
+      <div class="sidebar-section">
+        <h2 class="sidebar-heading">
+          <span class="sidebar-heading-rule"></span>
+          Taste profile
+        </h2>
+        <ul class="taste-list">
+          {% for g in taste_genres %}
+          <li class="taste-item{% if g.is_negative %} taste-item--negative{% endif %}">
+            <span class="taste-bar-wrap">
+              <span class="taste-bar" style="width: {{ g.width }}%;"></span>
+            </span>
+            <span class="taste-genre">{{ g.name }}</span>
+            <span class="taste-count">{% if g.is_negative %}Negative{% else %}{{ g.count }}{% endif %}</span>
+          </li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% endif %}
+
+      <div class="sidebar-section">
+        <h2 class="sidebar-heading">
+          <span class="sidebar-heading-rule"></span>
+          Quick links
+        </h2>
+        <div class="profile-link-list">
+          <a href="{% url 'journal:list' %}">Your journal</a>
+          <a href="{% url 'recommendations:list' %}">Recommendations</a>
+          <a href="{% url 'movies:wishlist' %}">Watchlist</a>
+        </div>
+      </div>
+    </aside>
+
+    <main class="profile-main">
+      <section class="profile-section">
+        <h2 class="section-heading">
+          <span class="section-heading-rule"></span>
+          Account settings
+        </h2>
+
+        <div class="profile-settings-grid">
+          <form method="post" class="settings-panel profile-platform-picker" novalidate>
+            {% csrf_token %}
+            <input type="hidden" name="account_action" value="update_platforms">
+
+            <div class="settings-panel__header">
+              <span class="settings-panel__mark">01</span>
+              <div>
+                <h3>Streaming services</h3>
+                <p>Keep recommendations matched to the platforms you actually use.</p>
+              </div>
+            </div>
+
+            {% if form.non_field_errors %}
+              <div class="non-field-errors">
+                {% for error in form.non_field_errors %}{{ error }}{% endfor %}
+              </div>
+            {% endif %}
+
+            <div class="form-group">
+              <label for="profile-platform-select">Streaming platforms</label>
+              {% if form.streaming_platforms.field.queryset %}
+                <select class="platform-select" id="profile-platform-select" aria-label="Add streaming platform">
+                  <option value="">Choose a platform</option>
+                  {% for platform in form.streaming_platforms.field.queryset %}
+                    <option value="{{ platform.id }}">{{ platform.name }}</option>
+                  {% endfor %}
+                </select>
+
+                <div class="chips platform-chips" id="profile-platform-chips">
+                  {% for platform in form.streaming_platforms.field.queryset %}
+                    {% if platform.id|stringformat:"s" in selected_streaming_platform_ids %}
+                      <span class="chip" data-platform-id="{{ platform.id }}">
+                        {{ platform.name }}
+                        <button type="button" class="chip-remove" aria-label="Remove {{ platform.name }}">x</button>
+                        <input type="hidden" name="streaming_platforms" value="{{ platform.id }}">
+                      </span>
+                    {% endif %}
+                  {% endfor %}
+                </div>
+              {% else %}
+                <p class="platform-empty">No streaming platforms are in the database yet.</p>
+              {% endif %}
+
+              {% if form.streaming_platforms.errors %}
+                <ul class="form-errors">
+                  {% for error in form.streaming_platforms.errors %}<li>{{ error }}</li>{% endfor %}
+                </ul>
+              {% endif %}
+            </div>
+
+            <button type="submit" class="btn-save-platforms">Save services</button>
+          </form>
+
+          <form method="post" class="settings-panel profile-password-form" novalidate>
+            {% csrf_token %}
+            <input type="hidden" name="account_action" value="change_password">
+
+            <div class="settings-panel__header">
+              <span class="settings-panel__mark">02</span>
+              <div>
+                <h3>Password</h3>
+                <p>Update your sign-in details while staying logged in here.</p>
+              </div>
+            </div>
+
+            {% if password_form.non_field_errors %}
+              <div class="non-field-errors">
+                {% for error in password_form.non_field_errors %}{{ error }}{% endfor %}
+              </div>
+            {% endif %}
+
+            <div class="form-group">
+              <label for="{{ password_form.old_password.id_for_label }}">Current password</label>
+              {{ password_form.old_password }}
+              {% if password_form.old_password.errors %}
+                <ul class="form-errors">
+                  {% for error in password_form.old_password.errors %}<li>{{ error }}</li>{% endfor %}
+                </ul>
+              {% endif %}
+            </div>
+
+            <div class="form-group">
+              <label for="{{ password_form.new_password1.id_for_label }}">New password</label>
+              {{ password_form.new_password1 }}
+              {% if password_form.new_password1.errors %}
+                <ul class="form-errors">
+                  {% for error in password_form.new_password1.errors %}<li>{{ error }}</li>{% endfor %}
+                </ul>
+              {% endif %}
+            </div>
+
+            <div class="form-group">
+              <label for="{{ password_form.new_password2.id_for_label }}">Confirm new password</label>
+              {{ password_form.new_password2 }}
+              {% if password_form.new_password2.errors %}
+                <ul class="form-errors">
+                  {% for error in password_form.new_password2.errors %}<li>{{ error }}</li>{% endfor %}
+                </ul>
+              {% endif %}
+            </div>
+
+            <button type="submit" class="btn-save-platforms">Change password</button>
+          </form>
+        </div>
+      </section>
+
+    </main>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  const profilePlatformSelect = document.getElementById("profile-platform-select");
+  const profilePlatformChips = document.getElementById("profile-platform-chips");
+
+  function syncProfilePlatformOptions() {
+    if (!profilePlatformSelect || !profilePlatformChips) return;
+
+    const selectedIds = Array.from(
+      profilePlatformChips.querySelectorAll('input[name="streaming_platforms"]')
+    ).map((input) => input.value);
+
+    Array.from(profilePlatformSelect.options).forEach((option) => {
+      option.disabled = option.value && selectedIds.includes(option.value);
+    });
+  }
+
+  function removeProfilePlatformChip(removeButton) {
+    removeButton.closest(".chip").remove();
+    syncProfilePlatformOptions();
+  }
+
+  function addProfilePlatformChip() {
+    if (!profilePlatformSelect || !profilePlatformSelect.value) return;
+
+    const selectedOption = profilePlatformSelect.options[profilePlatformSelect.selectedIndex];
+    const platformId = selectedOption.value;
+    const platformName = selectedOption.text;
+
+    if (profilePlatformChips.querySelector(`input[value="${platformId}"]`)) {
+      profilePlatformSelect.value = "";
+      return;
+    }
+
+    const chip = document.createElement("span");
+    const removeButton = document.createElement("button");
+    const hiddenInput = document.createElement("input");
+
+    chip.className = "chip";
+    chip.dataset.platformId = platformId;
+    chip.appendChild(document.createTextNode(platformName));
+
+    removeButton.type = "button";
+    removeButton.className = "chip-remove";
+    removeButton.textContent = "x";
+    removeButton.setAttribute("aria-label", `Remove ${platformName}`);
+    removeButton.addEventListener("click", () => removeProfilePlatformChip(removeButton));
+    chip.appendChild(removeButton);
+
+    hiddenInput.type = "hidden";
+    hiddenInput.name = "streaming_platforms";
+    hiddenInput.value = platformId;
+    chip.appendChild(hiddenInput);
+
+    profilePlatformChips.appendChild(chip);
+    profilePlatformSelect.value = "";
+    syncProfilePlatformOptions();
+  }
+
+  if (profilePlatformSelect) {
+    profilePlatformSelect.addEventListener("change", addProfilePlatformChip);
+    profilePlatformChips.querySelectorAll(".chip-remove").forEach((button) => {
+      button.addEventListener("click", () => removeProfilePlatformChip(button));
+    });
+    syncProfilePlatformOptions();
+  }
+</script>
+{% endblock %}
