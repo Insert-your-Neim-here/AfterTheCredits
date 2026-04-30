@@ -16,6 +16,9 @@ from recommendations.services import (
 )
 
 
+TEST_EMBEDDING = [0.1] * 384
+
+
 class RecommendationThresholdTests(TestCase):
     def setUp(self):
         self.user = get_user_model().objects.create_user(
@@ -39,6 +42,7 @@ class RecommendationThresholdTests(TestCase):
             user=self.user,
             movie=movie,
             raw_text="A logged film.",
+            embedding=TEST_EMBEDDING,
             is_positive=True,
         )
 
@@ -53,7 +57,10 @@ class RecommendationThresholdTests(TestCase):
         for tmdb_id in range(2, MIN_JOURNAL_ENTRIES + 2):
             self._add_entry(tmdb_id)
 
-        self.assertEqual(get_recommendations(self.user), [])
+        recs = get_recommendations(self.user)
+
+        self.assertEqual(len(recs), 1)
+        self.assertEqual(recs[0].explanation, "Similar feel to films you've enjoyed.")
         self.assertEqual(Recommendation.objects.count(), 0)
 
     def test_recommendation_links_use_tmdb_id_not_database_id(self):
@@ -78,7 +85,7 @@ class RecommendationThresholdTests(TestCase):
         )
         self.assertNotContains(response, reverse("movies:details", args=[self.movie.id]))
 
-    def test_recommendations_can_be_filtered_by_watch_session_runtime(self):
+    def test_runtime_selection_prioritizes_matches_without_removing_options(self):
         short_movie = Movie.objects.create(tmdb_id=9101, title="Short Pick", runtime=88)
         short_movie.embedding = [0.2] * 384
         short_movie.save(update_fields=["embedding"])
@@ -121,12 +128,49 @@ class RecommendationThresholdTests(TestCase):
                 explanation="No runtime",
             ),
         ]
-        with patch("recommendations.views.get_recommendations", return_value=recs):
+        with patch("recommendations.views.get_recommendations", return_value=recs) as mock_get:
             response = self.client.get(reverse("recommendations:list"), {"runtime": "90"})
 
         self.assertContains(response, "Short Pick")
-        self.assertNotContains(response, "Long Pick")
-        self.assertNotContains(response, "Candidate")
+        self.assertContains(response, "Long Pick")
+        self.assertContains(response, "Candidate")
+        mock_get.assert_called_once_with(self.user, runtime_minutes=90)
+
+        titles = [rec.movie.title for rec in response.context["recs"]]
+        self.assertEqual(titles, ["Short Pick", "Long Pick", "Candidate"])
+
+    def test_runtime_selection_generates_three_matching_movies_when_available(self):
+        for tmdb_id in range(2, MIN_JOURNAL_ENTRIES + 2):
+            self._add_entry(tmdb_id)
+
+        for index in range(3):
+            movie = Movie.objects.create(
+                tmdb_id=9200 + index,
+                title=f"Long Candidate {index}",
+                runtime=130 + index,
+            )
+            movie.embedding = [0.1] * 384
+            movie.save(update_fields=["embedding"])
+
+        short_movies = []
+        for index in range(3):
+            movie = Movie.objects.create(
+                tmdb_id=9300 + index,
+                title=f"Short Candidate {index}",
+                runtime=85 + index,
+            )
+            movie.embedding = [0.1] * 384
+            movie.save(update_fields=["embedding"])
+            short_movies.append(movie)
+
+        recs = get_recommendations(self.user, runtime_minutes=90)
+
+        self.assertEqual(len(recs), 3)
+        self.assertEqual(
+            {rec.movie.title for rec in recs},
+            {movie.title for movie in short_movies},
+        )
+        self.assertTrue(all(rec.movie.runtime <= 90 for rec in recs))
 
     def test_recommendations_page_does_not_show_refresh_action(self):
         for tmdb_id in range(2, MIN_JOURNAL_ENTRIES + 2):
@@ -229,6 +273,7 @@ class SurveyTasteSignalTests(TestCase):
             user=self.user,
             movie=movie,
             raw_text="This style did not work for me.",
+            embedding=TEST_EMBEDDING,
             is_positive=True,
             liked_genre=False,
             liked_story=True,
@@ -249,6 +294,7 @@ class SurveyTasteSignalTests(TestCase):
             user=self.user,
             movie=first_movie,
             raw_text="This style did not work for me.",
+            embedding=TEST_EMBEDDING,
             is_positive=True,
             liked_genre=False,
             liked_story=True,
@@ -259,6 +305,7 @@ class SurveyTasteSignalTests(TestCase):
             user=self.user,
             movie=second_movie,
             raw_text="I still do not enjoy this genre.",
+            embedding=TEST_EMBEDDING,
             is_positive=True,
             liked_genre=False,
             liked_story=True,
@@ -279,6 +326,7 @@ class SurveyTasteSignalTests(TestCase):
             user=self.user,
             movie=first_movie,
             raw_text="A couple of things worked, but mostly no.",
+            embedding=TEST_EMBEDDING,
             is_positive=True,
             liked_genre=True,
             liked_story=False,
@@ -289,6 +337,7 @@ class SurveyTasteSignalTests(TestCase):
             user=self.user,
             movie=second_movie,
             raw_text="Same problem again.",
+            embedding=TEST_EMBEDDING,
             is_positive=True,
             liked_genre=True,
             liked_story=False,

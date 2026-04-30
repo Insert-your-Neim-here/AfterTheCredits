@@ -36,6 +36,8 @@ AUTH_USER_MODEL = 'users.User'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+DATA_UPLOAD_MAX_NUMBER_FIELDS = 5000
+
 
 # Application definition
 

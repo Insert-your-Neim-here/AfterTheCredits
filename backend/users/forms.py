@@ -57,6 +57,15 @@ class LoginForm(forms.Form):
     )
 
 
+class ForgotPasswordEmailForm(forms.Form):
+    email = forms.EmailField(
+        widget=forms.EmailInput(attrs={'placeholder': 'Email address', 'autocomplete': 'email'})
+    )
+
+    def clean_email(self):
+        return self.cleaned_data['email'].lower()
+
+
 class VerificationCodeForm(forms.Form):
     code = forms.CharField(
         max_length=6,
@@ -70,6 +79,29 @@ class VerificationCodeForm(forms.Form):
 
     def clean_code(self):
         return self.cleaned_data['code'].strip()
+
+
+class PasswordResetConfirmForm(forms.Form):
+    new_password = forms.CharField(
+        widget=forms.PasswordInput(attrs={'placeholder': 'New password', 'autocomplete': 'new-password'})
+    )
+    confirm_password = forms.CharField(
+        widget=forms.PasswordInput(attrs={'placeholder': 'Confirm new password', 'autocomplete': 'new-password'})
+    )
+
+    def clean_new_password(self):
+        password = self.cleaned_data.get('new_password')
+        if password:
+            validate_password(password)
+        return password
+
+    def clean(self):
+        cleaned = super().clean()
+        password = cleaned.get('new_password')
+        confirm_password = cleaned.get('confirm_password')
+        if password and confirm_password and password != confirm_password:
+            self.add_error('confirm_password', 'Passwords do not match.')
+        return cleaned
 
 
 

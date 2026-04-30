@@ -27,6 +27,9 @@
   <div class="edit-form-wrap">
     <form method="post" class="edit-form" novalidate>
       {% csrf_token %}
+      {% if form.non_field_errors %}
+        <p class="form-error">{{ form.non_field_errors|join:", " }}</p>
+      {% endif %}
 
       {# Survey fields #}
       {% for field in form %}

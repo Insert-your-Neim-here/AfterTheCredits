@@ -8,6 +8,7 @@ from django.core.cache import cache
 
 VERIFICATION_CODE_LENGTH = 6
 VERIFICATION_CODE_TTL = 600  # 10 minutes
+PASSWORD_RESET_CODE_TTL = 600  # 10 minutes
 
 
 def generate_verification_code() -> str:
@@ -30,6 +31,22 @@ def send_verification_email(email: str) -> str:
     return code
 
 
+def send_password_reset_email(email: str) -> str:
+    """Generate a password reset code, cache it, send it, and return it."""
+    code = generate_verification_code()
+    cache_key = _password_reset_cache_key(email)
+    cache.set(cache_key, code, timeout=PASSWORD_RESET_CODE_TTL)
+
+    send_mail(
+        subject='Your After The Credits password reset code',
+        message=f'Your password reset code is: {code}\n\nIt expires in 10 minutes.',
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        recipient_list=[email],
+        fail_silently=False,
+    )
+    return code
+
+
 def verify_code(email: str, code: str) -> bool:
     """Return True and delete the code if it matches; False otherwise."""
     cache_key = _cache_key(email)
@@ -40,5 +57,19 @@ def verify_code(email: str, code: str) -> bool:
     return False
 
 
+def verify_password_reset_code(email: str, code: str) -> bool:
+    """Return True and delete the reset code if it matches; False otherwise."""
+    cache_key = _password_reset_cache_key(email)
+    stored = cache.get(cache_key)
+    if stored and stored == code:
+        cache.delete(cache_key)
+        return True
+    return False
+
+
 def _cache_key(email: str) -> str:
     return f'email_verify:{email}'
+
+
+def _password_reset_cache_key(email: str) -> str:
+    return f'password_reset:{email}'

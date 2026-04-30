@@ -14,7 +14,7 @@ from .models import (
 class MovieAdmin(admin.ModelAdmin):
     list_display = ['title', 'release_date', 'runtime', 'vote_average']
     search_fields = ['title', 'keywords__name']
-    list_filter = ['genres', 'keywords', 'streaming_platforms']
+    list_filter = ['genres', 'streaming_platforms']
 
 
 @admin.register(Genre)

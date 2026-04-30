@@ -255,7 +255,45 @@ def _build_explanation(
     return explanation, snippet
 
 
-def generate_recommendations(user: "User") -> list[Recommendation]:
+def _fetch_candidate_movies(qs, profile_vector, *, runtime_minutes: int | None = None):
+    if not runtime_minutes:
+        return list(
+            qs.annotate(vector_distance=CosineDistance("embedding", profile_vector))
+            .order_by("vector_distance")
+            .prefetch_related("genres", "streaming_platforms", "credits__person")[
+                :CANDIDATE_POOL
+            ]
+        )
+
+    runtime_matches = list(
+        qs.filter(runtime__isnull=False, runtime__lte=runtime_minutes)
+        .annotate(vector_distance=CosineDistance("embedding", profile_vector))
+        .order_by("vector_distance")
+        .prefetch_related("genres", "streaming_platforms", "credits__person")[
+            :CANDIDATE_POOL
+        ]
+    )
+
+    if len(runtime_matches) >= CANDIDATE_POOL:
+        return runtime_matches
+
+    runtime_match_ids = [movie.id for movie in runtime_matches]
+    fallback_candidates = list(
+        qs.exclude(id__in=runtime_match_ids)
+        .annotate(vector_distance=CosineDistance("embedding", profile_vector))
+        .order_by("vector_distance")
+        .prefetch_related("genres", "streaming_platforms", "credits__person")[
+            : CANDIDATE_POOL - len(runtime_matches)
+        ]
+    )
+    return runtime_matches + fallback_candidates
+
+
+def generate_recommendations(
+    user: "User",
+    *,
+    runtime_minutes: int | None = None,
+) -> list[Recommendation]:
     """
     Full pipeline: profile -> candidates -> re-rank -> return.
     Returns an empty list if the user has no journal entries with embeddings.
@@ -288,10 +326,10 @@ def generate_recommendations(user: "User") -> list[Recommendation]:
     if platform_ids:
         qs = qs.filter(streaming_platforms__id__in=platform_ids).distinct()
 
-    candidates = list(
-        qs.annotate(vector_distance=CosineDistance("embedding", profile_vector))
-        .order_by("vector_distance")
-        .prefetch_related("genres", "streaming_platforms", "credits__person")[:CANDIDATE_POOL]
+    candidates = _fetch_candidate_movies(
+        qs,
+        profile_vector,
+        runtime_minutes=runtime_minutes,
     )
 
     if not candidates and platform_ids:
@@ -300,13 +338,15 @@ def generate_recommendations(user: "User") -> list[Recommendation]:
             "falling back to all platforms.",
             user.pk,
         )
-        candidates = list(
+        fallback_qs = (
             Movie.objects.exclude(id__in=excluded_ids)
             .filter(embedding__isnull=False)
             .exclude(genres__id__in=excluded_genres)
-            .annotate(vector_distance=CosineDistance("embedding", profile_vector))
-            .order_by("vector_distance")
-            .prefetch_related("genres", "streaming_platforms", "credits__person")[:CANDIDATE_POOL]
+        )
+        candidates = _fetch_candidate_movies(
+            fallback_qs,
+            profile_vector,
+            runtime_minutes=runtime_minutes,
         )
 
     # 3. Re-rank with survey signals.
@@ -429,7 +469,16 @@ def generate_recommendations(user: "User") -> list[Recommendation]:
             scored.append((score, movie))
 
     scored.sort(key=lambda item: item[0], reverse=True)
-    top = scored[:TOP_N]
+    if runtime_minutes:
+        runtime_matches = [
+            item
+            for item in scored
+            if item[1].runtime is not None and item[1].runtime <= runtime_minutes
+        ]
+        fallback_matches = [item for item in scored if item not in runtime_matches]
+        top = (runtime_matches + fallback_matches)[:TOP_N]
+    else:
+        top = scored[:TOP_N]
 
     # 4. Build unsaved recommendation objects for display.
     recs = []
@@ -456,10 +505,14 @@ def generate_recommendations(user: "User") -> list[Recommendation]:
     return recs
 
 
-def get_recommendations(user: "User") -> list[Recommendation]:
+def get_recommendations(
+    user: "User",
+    *,
+    runtime_minutes: int | None = None,
+) -> list[Recommendation]:
     """Return freshly generated recommendations."""
     if not has_enough_journal_entries(user):
         Recommendation.objects.filter(user=user).delete()
         return []
 
-    return generate_recommendations(user)
+    return generate_recommendations(user, runtime_minutes=runtime_minutes)

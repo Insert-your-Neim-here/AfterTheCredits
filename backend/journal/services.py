@@ -50,7 +50,9 @@ def save_entry_with_embedding(entry: JournalEntry) -> JournalEntry:
 
 def create_entry_from_session(request, movie) -> JournalEntry:
     survey = get_survey_from_session(request)
-    entry, _ = JournalEntry.objects.get_or_create(user=request.user, movie=movie)
+    entry = JournalEntry.objects.filter(user=request.user, movie=movie).first()
+    if entry is None:
+        entry = JournalEntry(user=request.user, movie=movie)
     entry.is_positive = survey.get("is_positive")
     entry.liked_genre = survey.get("liked_genre")
     entry.liked_story = survey.get("liked_story")

@@ -16,8 +16,20 @@ from journal.services import get_user_journal_entries
 from movies.models import StreamingPlatform
 from recommendations.services import get_negative_genre_signal_ids
 
-from .forms import LoginForm, ProfileForm, SignupForm, VerificationCodeForm
-from .services.email_service import send_verification_email, verify_code
+from .forms import (
+    ForgotPasswordEmailForm,
+    LoginForm,
+    PasswordResetConfirmForm,
+    ProfileForm,
+    SignupForm,
+    VerificationCodeForm,
+)
+from .services.email_service import (
+    send_password_reset_email,
+    send_verification_email,
+    verify_code,
+    verify_password_reset_code,
+)
 
 User = get_user_model()
 
@@ -125,6 +137,90 @@ def login_view(request):
             form.add_error(None, 'Invalid email or password.')
 
     return render(request, 'users/login.html', {'form': form})
+
+
+@require_http_methods(['GET', 'POST'])
+def forgot_password_view(request):
+    if request.user.is_authenticated:
+        return redirect('movies:browse')
+
+    form = ForgotPasswordEmailForm(request.POST or None)
+
+    if request.method == 'POST' and form.is_valid():
+        email = form.cleaned_data['email']
+        if User.objects.filter(email=email).exists():
+            request.session['pending_password_reset_email'] = email
+            send_password_reset_email(email)
+            messages.success(request, f'A password reset code has been sent to {email}.')
+            return redirect('users:password_reset_verify')
+
+        form.add_error('email', 'No account was found with this email address.')
+
+    return render(request, 'users/forgot_password.html', {'form': form})
+
+
+@require_http_methods(['GET', 'POST'])
+def password_reset_verify_view(request):
+    if request.user.is_authenticated:
+        return redirect('movies:browse')
+
+    email = request.session.get('pending_password_reset_email')
+    if not email:
+        return redirect('users:forgot_password')
+
+    form = VerificationCodeForm(request.POST or None)
+
+    if request.method == 'POST' and form.is_valid():
+        code = form.cleaned_data['code']
+        if verify_password_reset_code(email, code):
+            request.session['password_reset_verified_email'] = email
+            del request.session['pending_password_reset_email']
+            return redirect('users:password_reset_confirm')
+
+        form.add_error('code', 'Invalid or expired code. Please try again.')
+
+    return render(request, 'users/password_reset_verify.html', {'form': form, 'email': email})
+
+
+@require_http_methods(['POST'])
+def resend_password_reset_code_view(request):
+    if request.user.is_authenticated:
+        return redirect('movies:browse')
+
+    email = request.session.get('pending_password_reset_email')
+    if not email:
+        return redirect('users:forgot_password')
+
+    send_password_reset_email(email)
+    messages.success(request, 'A new password reset code has been sent.')
+    return redirect('users:password_reset_verify')
+
+
+@require_http_methods(['GET', 'POST'])
+def password_reset_confirm_view(request):
+    if request.user.is_authenticated:
+        return redirect('movies:browse')
+
+    email = request.session.get('password_reset_verified_email')
+    if not email:
+        return redirect('users:forgot_password')
+
+    try:
+        user = User.objects.get(email=email)
+    except User.DoesNotExist:
+        request.session.pop('password_reset_verified_email', None)
+        return redirect('users:forgot_password')
+
+    form = PasswordResetConfirmForm(request.POST or None)
+
+    if request.method == 'POST' and form.is_valid():
+        user.set_password(form.cleaned_data['new_password'])
+        user.save(update_fields=['password'])
+        request.session.pop('password_reset_verified_email', None)
+        messages.success(request, 'Your password has been reset. Please log in.')
+        return redirect('users:login')
+
+    return render(request, 'users/password_reset_confirm.html', {'form': form})
 
 
 @login_required

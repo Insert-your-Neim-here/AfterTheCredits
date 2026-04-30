@@ -7,7 +7,7 @@ import requests
 from django.conf import settings
 from django.core.cache import cache
 from movies.models import Movie, Genre, Keyword, StreamingPlatform, MovieCredit, Person
-from core.services.embedding_service import build_movie_text, compute_embedding
+from core.services.embedding_service import compute_embedding
 
 logger = logging.getLogger(__name__)
 
@@ -17,6 +17,9 @@ STREAMING_REGION = getattr(settings, "TMDB_REGION", "GB")
 TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p/w500"
 TMDB_CACHE_TIMEOUT = 60 * 60 * 12
 PROVIDER_LOOKUP_WORKERS = 8
+
+tmdb_session = requests.Session()
+tmdb_session.trust_env = False
 
 if not TMDB_TOKEN:
     raise RuntimeError("TMDB_TOKEN is not set. Check your .env file.")
@@ -36,7 +39,7 @@ def _tmdb_get(path: str, params: dict | None = None) -> dict:
     if cached_data is not None:
         return cached_data
 
-    response = requests.get(
+    response = tmdb_session.get(
         f"{TMDB_BASE}{path}",
         headers=_headers(),
         params=params,
@@ -362,6 +365,22 @@ def _fetch_movie_list_page(list_type: str, page: int, region: str) -> dict:
         params={"language": "en-GB", "page": page, "region": region},
     )
 
+def build_movie_text(
+    title: str,
+    overview: str,
+    genres: list[str],
+    keywords: list[str] | None = None,
+    actors: list[str] | None = None,
+    producers: list[str] | None = None,
+    directors: list[str] | None = None,
+) -> str:
+    genre_str = ", ".join(genres) if genres else "Unknown"
+    keyword_str = ", ".join(keywords) if keywords else "Unknown"
+    actor_str = ", ".join(actors) if actors else "Unknown"
+    producer_str = ", ".join(producers) if producers else "Unknown"
+    director_str = ", ".join(directors) if directors else "Unknown"
+    return f"{title}. {overview} Genres: {genre_str}. Keywords: {keyword_str}. Actors: {actor_str}. Producers: {producer_str}. Directors: {director_str}."
+
 
 def _process_movie(
     item: dict,
@@ -411,7 +430,10 @@ def _process_movie(
 
     genre_names = [g.name for g in genre_objects]
     keyword_names = [keyword.name for keyword in keyword_objects]
-    text = build_movie_text(title, overview, genre_names, keyword_names)
+    actors = [credit.person.name for credit in MovieCredit.objects.filter(movie__tmdb_id=tmdb_id, role=MovieCredit.ROLE_ACTOR).select_related("person")]
+    producers = [credit.person.name for credit in MovieCredit.objects.filter(movie__tmdb_id=tmdb_id, role=MovieCredit.ROLE_PRODUCER).select_related("person")]
+    directors = [credit.person.name for credit in MovieCredit.objects.filter(movie__tmdb_id=tmdb_id, role=MovieCredit.ROLE_DIRECTOR).select_related("person")]
+    text = build_movie_text(title, overview, genre_names, keyword_names, actors, producers, directors)
     embedding = compute_embedding(text)
 
     movie_defaults = {

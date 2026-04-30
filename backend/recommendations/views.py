@@ -33,18 +33,12 @@ def _runtime_minutes(request):
 
 @login_required
 def recommendations_view(request):
-    recs = get_recommendations(request.user)
+    runtime_minutes = _runtime_minutes(request)
+    recs = get_recommendations(request.user, runtime_minutes=runtime_minutes)
     journal_count = get_journal_entry_count(request.user)
     can_generate = journal_count >= MIN_JOURNAL_ENTRIES
 
-    runtime_minutes = _runtime_minutes(request)
     unfiltered_has_recs = bool(recs)
-    if runtime_minutes:
-        recs = [
-            rec
-            for rec in recs
-            if rec.movie.runtime is not None and rec.movie.runtime <= runtime_minutes
-        ]
 
     context = {
         "recs": recs,
