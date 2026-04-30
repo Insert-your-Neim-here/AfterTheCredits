@@ -4,7 +4,7 @@ from django.urls import reverse
 from unittest.mock import patch
 
 from journal.models import JournalEntry
-from movies.models import Genre, Movie, MovieCredit, Person
+from movies.models import Genre, Movie, MovieCredit, Person, StreamingPlatform
 from recommendations.models import Recommendation
 from recommendations.services import (
     MAIN_ACTOR_LIMIT,
@@ -17,6 +17,8 @@ from recommendations.services import (
 
 
 TEST_EMBEDDING = [0.1] * 384
+POSITIVE_AXIS_EMBEDDING = [1.0] + [0.0] * 383
+NEGATIVE_AXIS_EMBEDDING = [-1.0] + [0.0] * 383
 
 
 class RecommendationThresholdTests(TestCase):
@@ -189,6 +191,143 @@ class RecommendationThresholdTests(TestCase):
         self.assertNotContains(response, "REFRESH")
         self.assertContains(response, "WATCH SESSION")
 
+    def test_recommendations_recompute_stale_profile_embedding(self):
+        self.user.profile_embedding = NEGATIVE_AXIS_EMBEDDING
+        self.user.save(update_fields=["profile_embedding"])
+        for tmdb_id in range(2, MIN_JOURNAL_ENTRIES + 2):
+            movie = Movie.objects.create(tmdb_id=tmdb_id, title=f"Seen {tmdb_id}")
+            JournalEntry.objects.create(
+                user=self.user,
+                movie=movie,
+                raw_text="A logged film.",
+                embedding=POSITIVE_AXIS_EMBEDDING,
+                is_positive=True,
+            )
+
+        positive_candidate = Movie.objects.create(
+            tmdb_id=9401,
+            title="Fresh Profile Pick",
+        )
+        positive_candidate.embedding = POSITIVE_AXIS_EMBEDDING
+        positive_candidate.save(update_fields=["embedding"])
+        stale_candidate = Movie.objects.create(
+            tmdb_id=9402,
+            title="Stale Profile Pick",
+        )
+        stale_candidate.embedding = NEGATIVE_AXIS_EMBEDDING
+        stale_candidate.save(update_fields=["embedding"])
+
+        recs = get_recommendations(self.user)
+
+        self.assertEqual(recs[0].movie, positive_candidate)
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.profile_embedding, POSITIVE_AXIS_EMBEDDING)
+
+    def test_platform_fallback_happens_when_platform_candidates_do_not_score(self):
+        platform = StreamingPlatform.objects.create(name="Chosen Streamer")
+        self.user.streaming_platforms.add(platform)
+        for tmdb_id in range(2, MIN_JOURNAL_ENTRIES + 2):
+            movie = Movie.objects.create(tmdb_id=tmdb_id, title=f"Seen {tmdb_id}")
+            JournalEntry.objects.create(
+                user=self.user,
+                movie=movie,
+                raw_text="A logged film.",
+                embedding=POSITIVE_AXIS_EMBEDDING,
+                is_positive=True,
+            )
+
+        weak_platform_movie = Movie.objects.create(
+            tmdb_id=9501,
+            title="Weak Platform Pick",
+        )
+        weak_platform_movie.embedding = NEGATIVE_AXIS_EMBEDDING
+        weak_platform_movie.save(update_fields=["embedding"])
+        weak_platform_movie.streaming_platforms.add(platform)
+
+        fallback_movie = Movie.objects.create(tmdb_id=9502, title="Fallback Pick")
+        fallback_movie.embedding = POSITIVE_AXIS_EMBEDDING
+        fallback_movie.save(update_fields=["embedding"])
+
+        recs = get_recommendations(self.user)
+
+        self.assertIn(fallback_movie, [rec.movie for rec in recs])
+        self.assertNotIn(weak_platform_movie, [rec.movie for rec in recs])
+
+    def test_runtime_candidate_fetch_backfills_when_runtime_pool_scores_poorly(self):
+        for tmdb_id in range(2, MIN_JOURNAL_ENTRIES + 2):
+            movie = Movie.objects.create(tmdb_id=tmdb_id, title=f"Seen {tmdb_id}")
+            JournalEntry.objects.create(
+                user=self.user,
+                movie=movie,
+                raw_text="A logged film.",
+                embedding=POSITIVE_AXIS_EMBEDDING,
+                is_positive=True,
+            )
+
+        for index in range(60):
+            movie = Movie.objects.create(
+                tmdb_id=9600 + index,
+                title=f"Weak Short Candidate {index}",
+                runtime=80,
+            )
+            movie.embedding = NEGATIVE_AXIS_EMBEDDING
+            movie.save(update_fields=["embedding"])
+
+        strong_long_movie = Movie.objects.create(
+            tmdb_id=9701,
+            title="Strong Long Candidate",
+            runtime=130,
+        )
+        strong_long_movie.embedding = POSITIVE_AXIS_EMBEDDING
+        strong_long_movie.save(update_fields=["embedding"])
+
+        recs = get_recommendations(self.user, runtime_minutes=90)
+
+        self.assertIn(strong_long_movie, [rec.movie for rec in recs])
+
+    def test_recommendation_scores_are_capped_for_display(self):
+        genre = Genre.objects.create(tmdb_id=18, name="Drama")
+        for tmdb_id in range(2, MIN_JOURNAL_ENTRIES + 2):
+            movie = Movie.objects.create(tmdb_id=tmdb_id, title=f"Seen {tmdb_id}")
+            movie.genres.add(genre)
+            JournalEntry.objects.create(
+                user=self.user,
+                movie=movie,
+                raw_text="A logged film.",
+                embedding=POSITIVE_AXIS_EMBEDDING,
+                is_positive=True,
+                liked_genre=True,
+                would_rewatch=True,
+            )
+
+        candidate = Movie.objects.create(tmdb_id=9801, title="Boosted Candidate")
+        candidate.embedding = POSITIVE_AXIS_EMBEDDING
+        candidate.save(update_fields=["embedding"])
+        candidate.genres.add(genre)
+
+        recs = get_recommendations(self.user)
+
+        self.assertLessEqual(recs[0].score, 1.0)
+
+    def test_explanation_snippet_falls_back_when_genres_do_not_overlap(self):
+        seen_genre = Genre.objects.create(tmdb_id=99, name="Seen Genre")
+        candidate_genre = Genre.objects.create(tmdb_id=100, name="Candidate Genre")
+        seen_movie = Movie.objects.create(tmdb_id=9901, title="Seen")
+        seen_movie.genres.add(seen_genre)
+        candidate = Movie.objects.create(tmdb_id=9902, title="Candidate")
+        candidate.genres.add(candidate_genre)
+        entry = JournalEntry.objects.create(
+            user=self.user,
+            movie=seen_movie,
+            raw_text="This journal text should still be available.",
+            embedding=TEST_EMBEDDING,
+            is_positive=True,
+        )
+
+        _, snippet = _build_explanation(candidate, set(), {entry.movie_id: entry})
+
+        self.assertEqual(snippet, entry.raw_text)
+
 
 class CreditSignalTests(TestCase):
     def test_credit_person_ids_uses_top_five_actors(self):
@@ -315,7 +454,7 @@ class SurveyTasteSignalTests(TestCase):
 
         self.assertEqual(_excluded_genre_ids([first_entry, second_entry]), {comedy.id})
 
-    def test_three_no_answers_count_as_negative_genre_signal(self):
+    def test_three_no_answers_count_as_negative_genre_signal_when_genre_was_not_liked(self):
         thriller = Genre.objects.create(tmdb_id=53, name="Thriller")
         first_movie = Movie.objects.create(tmdb_id=201, title="Mostly Disliked Thriller")
         second_movie = Movie.objects.create(tmdb_id=202, title="Another Bad Thriller")
@@ -328,9 +467,9 @@ class SurveyTasteSignalTests(TestCase):
             raw_text="A couple of things worked, but mostly no.",
             embedding=TEST_EMBEDDING,
             is_positive=True,
-            liked_genre=True,
+            liked_genre=False,
             liked_story=False,
-            liked_performances=False,
+            liked_performances=True,
             would_rewatch=False,
         )
         second_entry = JournalEntry.objects.create(
@@ -339,12 +478,44 @@ class SurveyTasteSignalTests(TestCase):
             raw_text="Same problem again.",
             embedding=TEST_EMBEDDING,
             is_positive=True,
-            liked_genre=True,
+            liked_genre=False,
             liked_story=False,
-            liked_performances=False,
+            liked_performances=True,
             would_rewatch=False,
         )
 
         self.assertEqual(first_entry.survey_score, 2)
         self.assertEqual(second_entry.survey_score, 2)
         self.assertEqual(_excluded_genre_ids([first_entry, second_entry]), {thriller.id})
+
+    def test_overall_dislike_does_not_exclude_genre_when_genre_was_liked(self):
+        thriller = Genre.objects.create(tmdb_id=53, name="Thriller")
+        first_movie = Movie.objects.create(tmdb_id=201, title="Mixed Thriller")
+        second_movie = Movie.objects.create(tmdb_id=202, title="Another Mixed Thriller")
+        first_movie.genres.add(thriller)
+        second_movie.genres.add(thriller)
+
+        first_entry = JournalEntry.objects.create(
+            user=self.user,
+            movie=first_movie,
+            raw_text="Bad film, good genre.",
+            embedding=TEST_EMBEDDING,
+            is_positive=False,
+            liked_genre=True,
+            liked_story=False,
+            liked_performances=False,
+            would_rewatch=False,
+        )
+        second_entry = JournalEntry.objects.create(
+            user=self.user,
+            movie=second_movie,
+            raw_text="Still like the genre, not this movie.",
+            embedding=TEST_EMBEDDING,
+            is_positive=False,
+            liked_genre=True,
+            liked_story=False,
+            liked_performances=False,
+            would_rewatch=False,
+        )
+
+        self.assertEqual(_excluded_genre_ids([first_entry, second_entry]), set())

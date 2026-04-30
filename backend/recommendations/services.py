@@ -3,8 +3,8 @@ Recommendation engine for After The Credits.
 
 Strategy
 --------
-1. Build a profile embedding from the user's journal-entry embeddings, weighting
-   each entry by its survey score so highly rated films pull harder.
+1. Build a profile embedding from the user's journal-entry embeddings,
+   weighting each entry by its survey score so highly rated films pull harder.
 2. Find candidate movies via cosine similarity against that profile vector.
 3. Apply a multi-signal re-ranking pass using the journal survey:
    - overall positivity (is_positive) boosts matching directors/producers
@@ -23,7 +23,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
-from pgvector.django import CosineDistance
+from pgvector.django import CosineDistance  # pylint: disable=import-error
 
 from journal.models import JournalEntry
 from movies.models import Movie, MovieCredit
@@ -46,6 +46,7 @@ STORY_CREW_BOOST = 0.10
 PERFORMANCE_BOOST = 0.10
 REWATCH_MULTIPLIER = 1.20  # strengthens matches to rewatchable movies
 MIN_SCORE = 0.10  # discard anything below this threshold
+MAX_DISPLAY_SCORE = 1.0
 MAIN_ACTOR_LIMIT = 5
 EXPLANATION_NAME_LIMIT = 2
 NEGATIVE_GENRE_SIGNAL_THRESHOLD = 2
@@ -68,7 +69,7 @@ def _credit_person_ids(
 
     person_ids: set[int] = set()
     actors_seen = 0
-    for credit in movie.credits.all():
+    for credit in movie.credits.all(): # type: ignore
         if credit.role not in roles:
             continue
         if credit.role == MovieCredit.ROLE_ACTOR and actor_limit is not None:
@@ -90,7 +91,7 @@ def _matching_credit_names(
     seen: set[int] = set()
     actors_seen = 0
 
-    for credit in movie.credits.all():
+    for credit in movie.credits.all(): # type: ignore
         if credit.role != role:
             continue
         if role == MovieCredit.ROLE_ACTOR and actor_limit is not None:
@@ -129,15 +130,19 @@ def _is_negative_taste_signal(entry: JournalEntry) -> bool:
 
 
 def _has_negative_genre_signal(entry: JournalEntry) -> bool:
-    return entry.liked_genre is False or _is_negative_taste_signal(entry)
+    return entry.liked_genre is False or (
+        entry.liked_genre is not True and _is_negative_taste_signal(entry)
+    )
 
 
 def _excluded_genre_ids(entries: list[JournalEntry]) -> set[int]:
     """
-    Genres that should not be recommended again after repeated negative signals.
+    Genres that should not be recommended again after repeated negative
+    signals.
 
-    A single disappointing film should not block a genre. Once the same genre is
-    disliked across multiple journal entries, stop recommending that genre.
+    A single disappointing film should not block a genre. Once the same
+    genre is disliked across multiple journal entries, stop recommending
+    that genre.
     """
     negative_counts: dict[int, int] = {}
     for entry in entries:
@@ -154,6 +159,7 @@ def _excluded_genre_ids(entries: list[JournalEntry]) -> set[int]:
 
 
 def get_negative_genre_signal_ids(entries: list[JournalEntry]) -> set[int]:
+    """Return genres touched by any negative journal signal."""
     ids: set[int] = set()
     for entry in entries:
         if _has_negative_genre_signal(entry):
@@ -162,6 +168,7 @@ def get_negative_genre_signal_ids(entries: list[JournalEntry]) -> set[int]:
 
 
 def get_excluded_genre_ids(entries: list[JournalEntry]) -> set[int]:
+    """Return genres that have crossed the repeated-negative threshold."""
     return _excluded_genre_ids(entries)
 
 
@@ -173,12 +180,18 @@ def _person_ids_from_entries(
 ) -> set[int]:
     ids: set[int] = set()
     for entry in entries:
-        ids.update(_credit_person_ids(entry.movie, roles, actor_limit=actor_limit))
+        ids.update(
+            _credit_person_ids(
+                entry.movie,
+                roles,
+                actor_limit=actor_limit,
+            )
+        )
     return ids
 
 
 def _journalled_movie_ids(entries: list[JournalEntry]) -> set[int]:
-    return {entry.movie_id for entry in entries if entry.movie_id is not None}
+    return {entry.movie_id for entry in entries if entry.movie_id is not None} # type: ignore
 
 
 def _genre_ids_from_entries(entries) -> set[int]:
@@ -189,10 +202,12 @@ def _genre_ids_from_entries(entries) -> set[int]:
 
 
 def get_journal_entry_count(user: "User") -> int:
+    """Return the count of journal entries that are linked to movies."""
     return JournalEntry.objects.filter(user=user, movie__isnull=False).count()
 
 
 def has_enough_journal_entries(user: "User") -> bool:
+    """Return whether the user has enough entries for recommendations."""
     return get_journal_entry_count(user) >= MIN_JOURNAL_ENTRIES
 
 
@@ -206,15 +221,19 @@ def _build_explanation(
     writer_ids: set[int] | None = None,
     actor_ids: set[int] | None = None,
 ) -> tuple[str, str]:
+    # pylint: disable=too-many-arguments,too-many-locals
     """
     Return (explanation, journal_snippet) for a recommended movie.
     """
     movie_genres = list(movie.genres.all())
     movie_genre_ids = {genre.id for genre in movie_genres}
-    matching_genres = [genre.name for genre in movie_genres if genre.id in liked_genres]
+    matching_genres = [
+        genre.name for genre in movie_genres if genre.id in liked_genres
+    ]
 
     if matching_genres:
-        explanation = f"Matches your taste for {', '.join(matching_genres[:2])}."
+        genre_names = ", ".join(matching_genres[:2])
+        explanation = f"Matches your taste for {genre_names}."
     else:
         explanation = "Similar feel to films you've enjoyed."
 
@@ -241,7 +260,8 @@ def _build_explanation(
             people_matches.append(f"{label} {', '.join(names)}")
 
     if people_matches:
-        explanation = f"{explanation} Also connects through {'; '.join(people_matches[:3])}."
+        people_names = "; ".join(people_matches[:3])
+        explanation = f"{explanation} Also connects through {people_names}."
 
     # Find a journal entry whose genres overlap most with this movie.
     snippet = ""
@@ -252,175 +272,72 @@ def _build_explanation(
             best_overlap = overlap
             snippet = entry.raw_text[:200]
 
+    if not snippet:
+        for entry in entry_map.values():
+            if entry.raw_text:
+                snippet = entry.raw_text[:200]
+                break
+
     return explanation, snippet
 
 
-def _fetch_candidate_movies(qs, profile_vector, *, runtime_minutes: int | None = None):
+def _fetch_candidate_movies(
+    qs,
+    profile_vector,
+    *,
+    runtime_minutes: int | None = None,
+):
     if not runtime_minutes:
+        distance = CosineDistance("embedding", profile_vector)
         return list(
-            qs.annotate(vector_distance=CosineDistance("embedding", profile_vector))
+            qs.annotate(vector_distance=distance)
             .order_by("vector_distance")
-            .prefetch_related("genres", "streaming_platforms", "credits__person")[
-                :CANDIDATE_POOL
-            ]
+            .prefetch_related(
+                "genres",
+                "streaming_platforms",
+                "credits__person",
+            )[:CANDIDATE_POOL]
         )
 
+    distance = CosineDistance("embedding", profile_vector)
     runtime_matches = list(
         qs.filter(runtime__isnull=False, runtime__lte=runtime_minutes)
-        .annotate(vector_distance=CosineDistance("embedding", profile_vector))
+        .annotate(vector_distance=distance)
         .order_by("vector_distance")
-        .prefetch_related("genres", "streaming_platforms", "credits__person")[
-            :CANDIDATE_POOL
-        ]
+        .prefetch_related(
+            "genres",
+            "streaming_platforms",
+            "credits__person",
+        )[:CANDIDATE_POOL]
     )
-
-    if len(runtime_matches) >= CANDIDATE_POOL:
-        return runtime_matches
 
     runtime_match_ids = [movie.id for movie in runtime_matches]
     fallback_candidates = list(
         qs.exclude(id__in=runtime_match_ids)
-        .annotate(vector_distance=CosineDistance("embedding", profile_vector))
+        .annotate(vector_distance=distance)
         .order_by("vector_distance")
-        .prefetch_related("genres", "streaming_platforms", "credits__person")[
-            : CANDIDATE_POOL - len(runtime_matches)
-        ]
+        .prefetch_related(
+            "genres",
+            "streaming_platforms",
+            "credits__person",
+        )[:CANDIDATE_POOL]
     )
     return runtime_matches + fallback_candidates
 
 
-def generate_recommendations(
-    user: "User",
+def _score_candidates(
+    candidates: list[Movie],
     *,
-    runtime_minutes: int | None = None,
-) -> list[Recommendation]:
-    """
-    Full pipeline: profile -> candidates -> re-rank -> return.
-    Returns an empty list if the user has no journal entries with embeddings.
-    """
-    Recommendation.objects.filter(user=user).delete()
-
-    entries = list(
-        JournalEntry.objects.filter(user=user, movie__isnull=False)
-        .select_related("movie")
-        .prefetch_related("movie__genres", "movie__credits__person")
-    )
-
-    if len(entries) < MIN_JOURNAL_ENTRIES:
-        return []
-
-    # 1. Read the persisted profile embedding, refreshing it if needed.
-    profile_vector = user.profile_embedding or update_user_profile_embedding(user)
-    if not profile_vector:
-        return []
-
-    # 2. Fetch candidate movies via pgvector cosine similarity.
-    excluded_ids = _journalled_movie_ids(entries)
-    platform_ids = _get_platform_ids(user)
-    excluded_genres = _excluded_genre_ids(entries)
-
-    qs = Movie.objects.exclude(id__in=excluded_ids).filter(embedding__isnull=False)
-    if excluded_genres:
-        qs = qs.exclude(genres__id__in=excluded_genres)
-
-    if platform_ids:
-        qs = qs.filter(streaming_platforms__id__in=platform_ids).distinct()
-
-    candidates = _fetch_candidate_movies(
-        qs,
-        profile_vector,
-        runtime_minutes=runtime_minutes,
-    )
-
-    if not candidates and platform_ids:
-        logger.info(
-            "No platform-matching recommendation candidates for user %s; "
-            "falling back to all platforms.",
-            user.pk,
-        )
-        fallback_qs = (
-            Movie.objects.exclude(id__in=excluded_ids)
-            .filter(embedding__isnull=False)
-            .exclude(genres__id__in=excluded_genres)
-        )
-        candidates = _fetch_candidate_movies(
-            fallback_qs,
-            profile_vector,
-            runtime_minutes=runtime_minutes,
-        )
-
-    # 3. Re-rank with survey signals.
-    liked_genres = _liked_genre_ids(entries)
-    entry_map = {entry.movie_id: entry for entry in entries if entry.movie_id is not None}
-
-    rewatch_yes_entries = {entry for entry in entries if entry.would_rewatch is True}
-    positive_entries = {entry for entry in entries if entry.is_positive is True}
-    story_liked_entries = {entry for entry in entries if entry.liked_story is True}
-    perf_liked_entries = {
-        entry for entry in entries if entry.liked_performances is True
-    }
-
-    rewatch_genre_ids = _genre_ids_from_entries(rewatch_yes_entries)
-    rewatch_crew_ids = _person_ids_from_entries(
-        rewatch_yes_entries,
-        {
-            MovieCredit.ROLE_DIRECTOR,
-            MovieCredit.ROLE_PRODUCER,
-            MovieCredit.ROLE_WRITER,
-        },
-    )
-    rewatch_actor_ids = _person_ids_from_entries(
-        rewatch_yes_entries,
-        {MovieCredit.ROLE_ACTOR},
-        actor_limit=MAIN_ACTOR_LIMIT,
-    )
-    positive_crew_ids = _person_ids_from_entries(
-        positive_entries,
-        {MovieCredit.ROLE_DIRECTOR, MovieCredit.ROLE_PRODUCER},
-    )
-    positive_director_ids = _person_ids_from_entries(
-        positive_entries,
-        {MovieCredit.ROLE_DIRECTOR},
-    )
-    positive_producer_ids = _person_ids_from_entries(
-        positive_entries,
-        {MovieCredit.ROLE_PRODUCER},
-    )
-    story_crew_ids = _person_ids_from_entries(
-        story_liked_entries,
-        {MovieCredit.ROLE_WRITER, MovieCredit.ROLE_DIRECTOR},
-    )
-    story_director_ids = _person_ids_from_entries(
-        story_liked_entries,
-        {MovieCredit.ROLE_DIRECTOR},
-    )
-    story_writer_ids = _person_ids_from_entries(
-        story_liked_entries,
-        {MovieCredit.ROLE_WRITER},
-    )
-    performance_actor_ids = _person_ids_from_entries(
-        perf_liked_entries,
-        {MovieCredit.ROLE_ACTOR},
-        actor_limit=MAIN_ACTOR_LIMIT,
-    )
-    rewatch_director_ids = _person_ids_from_entries(
-        rewatch_yes_entries,
-        {MovieCredit.ROLE_DIRECTOR},
-    )
-    rewatch_producer_ids = _person_ids_from_entries(
-        rewatch_yes_entries,
-        {MovieCredit.ROLE_PRODUCER},
-    )
-    rewatch_writer_ids = _person_ids_from_entries(
-        rewatch_yes_entries,
-        {MovieCredit.ROLE_WRITER},
-    )
-
-    explanation_director_ids = positive_director_ids | story_director_ids | rewatch_director_ids
-    explanation_producer_ids = positive_producer_ids | rewatch_producer_ids
-    explanation_writer_ids = story_writer_ids | rewatch_writer_ids
-    explanation_actor_ids = performance_actor_ids | rewatch_actor_ids
-
+    liked_genres: set[int],
+    excluded_genres: set[int],
+    positive_crew_ids: set[int],
+    story_crew_ids: set[int],
+    performance_actor_ids: set[int],
+    rewatch_genre_ids: set[int],
+    rewatch_crew_ids: set[int],
+    rewatch_actor_ids: set[int],
+) -> list[tuple[float, Movie]]:
+    # pylint: disable=too-many-arguments,too-many-locals
     scored: list[tuple[float, Movie]] = []
 
     for movie in candidates:
@@ -469,16 +386,217 @@ def generate_recommendations(
             scored.append((score, movie))
 
     scored.sort(key=lambda item: item[0], reverse=True)
+    return scored
+
+
+def _pick_top_recommendations(
+    scored: list[tuple[float, Movie]],
+    *,
+    runtime_minutes: int | None = None,
+) -> list[tuple[float, Movie]]:
     if runtime_minutes:
         runtime_matches = [
             item
             for item in scored
-            if item[1].runtime is not None and item[1].runtime <= runtime_minutes
+            if (
+                item[1].runtime is not None
+                and item[1].runtime <= runtime_minutes
+            )
         ]
-        fallback_matches = [item for item in scored if item not in runtime_matches]
-        top = (runtime_matches + fallback_matches)[:TOP_N]
-    else:
-        top = scored[:TOP_N]
+        fallback_matches = [
+            item for item in scored if item not in runtime_matches
+        ]
+        return (runtime_matches + fallback_matches)[:TOP_N]
+
+    return scored[:TOP_N]
+
+
+def generate_recommendations(
+    user: "User",
+    *,
+    runtime_minutes: int | None = None,
+) -> list[Recommendation]:
+    # pylint: disable=too-many-locals,too-many-statements
+    """
+    Full pipeline: profile -> candidates -> re-rank -> return.
+    Returns an empty list if the user has no journal entries with embeddings.
+    """
+    Recommendation.objects.filter(user=user).delete()
+
+    entries = list(
+        JournalEntry.objects.filter(user=user, movie__isnull=False)
+        .select_related("movie")
+        .prefetch_related("movie__genres", "movie__credits__person")
+    )
+
+    if len(entries) < MIN_JOURNAL_ENTRIES:
+        return []
+
+    # 1. Recompute the profile embedding so recommendations stay fresh.
+    profile_vector = update_user_profile_embedding(user)
+    if not profile_vector:
+        return []
+
+    # 2. Fetch candidate movies via pgvector cosine similarity.
+    excluded_ids = _journalled_movie_ids(entries)
+    platform_ids = _get_platform_ids(user)
+    excluded_genres = _excluded_genre_ids(entries)
+
+    qs = Movie.objects.exclude(id__in=excluded_ids).filter(
+        embedding__isnull=False,
+    )
+    if excluded_genres:
+        qs = qs.exclude(genres__id__in=excluded_genres)
+
+    if platform_ids:
+        qs = qs.filter(streaming_platforms__id__in=platform_ids).distinct()
+
+    candidates = _fetch_candidate_movies(
+        qs,
+        profile_vector,
+        runtime_minutes=runtime_minutes,
+    )
+
+    # 3. Re-rank with survey signals.
+    liked_genres = _liked_genre_ids(entries)
+    entry_map = {
+        entry.movie_id: entry # type: ignore
+        for entry in entries
+        if entry.movie_id is not None # type: ignore
+    }
+
+    rewatch_yes_entries = {
+        entry for entry in entries if entry.would_rewatch is True
+    }
+    positive_entries = {
+        entry for entry in entries if entry.is_positive is True
+    }
+    story_liked_entries = {
+        entry for entry in entries if entry.liked_story is True
+    }
+    perf_liked_entries = {
+        entry for entry in entries if entry.liked_performances is True
+    }
+
+    rewatch_genre_ids = _genre_ids_from_entries(rewatch_yes_entries)
+    rewatch_crew_ids = _person_ids_from_entries(
+        rewatch_yes_entries, # type: ignore
+        {
+            MovieCredit.ROLE_DIRECTOR,
+            MovieCredit.ROLE_PRODUCER,
+            MovieCredit.ROLE_WRITER,
+        },
+    )
+    rewatch_actor_ids = _person_ids_from_entries(
+        rewatch_yes_entries, # type: ignore
+        {MovieCredit.ROLE_ACTOR},
+        actor_limit=MAIN_ACTOR_LIMIT,
+    )
+    positive_crew_ids = _person_ids_from_entries(
+        positive_entries, # type: ignore
+        {MovieCredit.ROLE_DIRECTOR, MovieCredit.ROLE_PRODUCER},
+    )
+    positive_director_ids = _person_ids_from_entries(
+        positive_entries, # type: ignore
+        {MovieCredit.ROLE_DIRECTOR},
+    )
+    positive_producer_ids = _person_ids_from_entries(
+        positive_entries, # type: ignore
+        {MovieCredit.ROLE_PRODUCER},
+    )
+    story_crew_ids = _person_ids_from_entries(
+        story_liked_entries, # type: ignore
+        {MovieCredit.ROLE_WRITER, MovieCredit.ROLE_DIRECTOR},
+    )
+    story_director_ids = _person_ids_from_entries(
+        story_liked_entries, # type: ignore
+        {MovieCredit.ROLE_DIRECTOR},
+    )
+    story_writer_ids = _person_ids_from_entries(
+        story_liked_entries, # type: ignore
+        {MovieCredit.ROLE_WRITER},
+    )
+    performance_actor_ids = _person_ids_from_entries(
+        perf_liked_entries, # type: ignore
+        {MovieCredit.ROLE_ACTOR},
+        actor_limit=MAIN_ACTOR_LIMIT,
+    )
+    rewatch_director_ids = _person_ids_from_entries(
+        rewatch_yes_entries, # type: ignore
+        {MovieCredit.ROLE_DIRECTOR},
+    )
+    rewatch_producer_ids = _person_ids_from_entries(
+        rewatch_yes_entries, # type: ignore
+        {MovieCredit.ROLE_PRODUCER},
+    )
+    rewatch_writer_ids = _person_ids_from_entries(
+        rewatch_yes_entries, # type: ignore
+        {MovieCredit.ROLE_WRITER},
+    )
+
+    explanation_director_ids = (
+        positive_director_ids
+        | story_director_ids
+        | rewatch_director_ids
+    )
+    explanation_producer_ids = positive_producer_ids | rewatch_producer_ids
+    explanation_writer_ids = story_writer_ids | rewatch_writer_ids
+    explanation_actor_ids = performance_actor_ids | rewatch_actor_ids
+
+    scored = _score_candidates(
+        candidates,
+        liked_genres=liked_genres,
+        excluded_genres=excluded_genres,
+        positive_crew_ids=positive_crew_ids,
+        story_crew_ids=story_crew_ids,
+        performance_actor_ids=performance_actor_ids,
+        rewatch_genre_ids=rewatch_genre_ids,
+        rewatch_crew_ids=rewatch_crew_ids,
+        rewatch_actor_ids=rewatch_actor_ids,
+    )
+
+    if platform_ids and len(scored) < TOP_N:
+        logger.info(
+            "Only %s platform-matching recommendation candidates scored "
+            "for user %s; "
+            "falling back to all platforms.",
+            len(scored),
+            user.pk,
+        )
+        fallback_qs = Movie.objects.exclude(id__in=excluded_ids).filter(
+            embedding__isnull=False
+        )
+        if excluded_genres:
+            fallback_qs = fallback_qs.exclude(genres__id__in=excluded_genres)
+
+        fallback_candidates = _fetch_candidate_movies(
+            fallback_qs,
+            profile_vector,
+            runtime_minutes=runtime_minutes,
+        )
+        seen_ids = {movie.id for _, movie in scored} # type: ignore
+        fallback_scored = _score_candidates(
+            [
+                movie
+                for movie in fallback_candidates
+                if movie.id not in seen_ids # type: ignore
+            ],
+            liked_genres=liked_genres,
+            excluded_genres=excluded_genres,
+            positive_crew_ids=positive_crew_ids,
+            story_crew_ids=story_crew_ids,
+            performance_actor_ids=performance_actor_ids,
+            rewatch_genre_ids=rewatch_genre_ids,
+            rewatch_crew_ids=rewatch_crew_ids,
+            rewatch_actor_ids=rewatch_actor_ids,
+        )
+        scored = sorted(
+            scored + fallback_scored,
+            key=lambda item: item[0],
+            reverse=True,
+        )
+
+    top = _pick_top_recommendations(scored, runtime_minutes=runtime_minutes)
 
     # 4. Build unsaved recommendation objects for display.
     recs = []
@@ -496,7 +614,7 @@ def generate_recommendations(
             Recommendation(
                 user=user,
                 movie=movie,
-                score=round(score, 4),
+                score=round(min(score, MAX_DISPLAY_SCORE), 4),
                 explanation=explanation,
                 journal_snippet=snippet,
             )

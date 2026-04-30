@@ -1,4 +1,4 @@
-django>=4.2,<5.0
+django
 psycopg2-binary
 pgvector
 python-dotenv
