@@ -97,25 +97,6 @@ The Django admin is available at:
 http://127.0.0.1:8000/admin/
 ```
 
-## Useful Commands
-
-Run tests:
-
-```powershell
-python manage.py test
-```
-
-Stop the database:
-
-```powershell
-docker compose down
-```
-
-Stop the database and delete its stored data:
-
-```powershell
-docker compose down -v
-```
 
 ## Notes
 
