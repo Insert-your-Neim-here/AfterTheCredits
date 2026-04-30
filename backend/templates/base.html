@@ -20,7 +20,6 @@
 
         <ul class="navbar__links">
             <li><a href="{% url 'movies:browse' %}" class="{% if request.resolver_match.app_name == 'movies' and request.resolver_match.url_name != 'wishlist' %}is-active{% endif %}">Browse</a></li>
-            <li><a href="#">About</a></li>
             {% if user.is_authenticated %}
             <li><a href="{% url 'journal:list' %}" class="{% if request.resolver_match.app_name == 'journal' %}is-active{% endif %}">Journal</a></li>
             <li><a href="{% url 'recommendations:list' %}" class="{% if request.resolver_match.app_name == 'recommendations' %}is-active{% endif %}">For You</a></li>
