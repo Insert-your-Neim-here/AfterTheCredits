@@ -1,8 +1,4 @@
 """
-Recommendation engine for After The Credits.
-
-Strategy
---------
 1. Build a profile embedding from the user's journal-entry embeddings,
    weighting each entry by its survey score so highly rated films pull harder.
 2. Find candidate movies via cosine similarity against that profile vector.
